@@ -1,6 +1,7 @@
 #define _USE_MATH_DEFINES
 
 #include <iostream>
+#include <memory>
 #include <thread>
 #include <vector>
 #include <chrono>
@@ -19,16 +20,21 @@
 #include "gameObject.h"
 #include "scene.h"
 #include "registry.h"
+#include "system.h"
+#include "sinAnimSystem.h"
+#include "spinSystem.h"
 
 #ifdef _WIN32
 #include "window_polyfill.h"
 #endif
 
-struct SinComponent {
-    float startY;
-};
-
 Registry registry;
+std::vector<std::unique_ptr<BaseSystem>> systems;
+
+template<typename T>
+void BindSystem() {
+    systems.push_back(std::make_unique<T>());
+}
 
 const int WIDTH = 80;
 const int HEIGHT = 40;
@@ -85,15 +91,6 @@ Entity loadSceneFile(const std::string& filename) {
     return registry.getEntiityCount();
 }
 
-void spinObjects(ComponentArr<Transform>& transforms, float angle) {
-    for (auto& [entity, transformIndex] : transforms.entityToIndex) {
-        auto& transform = transforms.data[transformIndex];
-        transform.rotation.y = angle;
-        transform.rotation.x = angle * 0.5f;
-        transform.rotation.z = angle * 0.25f;
-    }
-}
-
 void updateCamera(Camera& cam) {
     if (GetAsyncKeyState(VK_UP) & 0x8000) {
         cam.rotation.x -= 0.05f;
@@ -128,16 +125,17 @@ void updateCamera(Camera& cam) {
     }
 }
 
-void SinAnimSystem(ComponentArr<SinComponent>& sinComponents, ComponentArr<Transform>& transforms, float time) {
-    for (auto& [entity, sinIndex] : sinComponents.entityToIndex) {
-        auto& sinComp = sinComponents.data[sinIndex];
-        auto* transform = transforms.tryGet(entity);
-        if (transform) {
-            transform->position.y = sinComp.startY + std::sin(time * 5) * 0.5f;
-        }
+void startSystems() {
+    for (auto& system : systems) {
+        system->doStart(registry);
     }
 }
 
+void updateSystems(float deltaTime) {
+    for (auto& system : systems) {
+        system->doUpdate(registry, deltaTime);
+    }
+}
 
 int main() {
 #ifdef _WIN32
@@ -162,14 +160,19 @@ int main() {
 
     Renderer renderer(WIDTH, HEIGHT, fov);
 
+    registry.get<SinComponent>().addComponent(1, SinComponent());
     auto test = registry.view<Transform, Model>();
+
+    BindSystem<SinAnimSystem>();
+    BindSystem<SpinSystem>();
+    startSystems();
 
     while (true) {
         renderer.clearBuffer();
         updateCamera(cam);
         auto t0 = std::chrono::high_resolution_clock::now();
+        updateSystems(0.016f);
         renderer.render(cam, test);
-        spinObjects(registry.get<Transform>(), angle);
         // SinAnimSystem(registry.getComponentArray<SinComponent>(), registry.getComponentArray<Transform>(), time);
 
         auto t1 = std::chrono::high_resolution_clock::now();
@@ -177,10 +180,9 @@ int main() {
         std::cout << "Frame: " << ms << " ms\n";
         angle += 0.05f;
         // std::cout << debugLog.size() << "\n";
-        // for (size_t i = 0; i < debugLog.size(); ++i) {
-        //     std::cout << debugLog[i] << "\n";
-        // }
-        // std::cout << "Revolutions: " << revolution << "\n";
+        for (size_t i = 0; i < renderer.renderLog.size(); ++i) {
+            std::cout << renderer.renderLog[i] << "\n";
+        }
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         time += 0.016f;
     }

@@ -13,7 +13,7 @@ public:
         }
 
         auto operator*() {
-            Entity e = m_view->primary().entityToIndex.at(m_index);
+            Entity e = m_view->primary().getEntity(m_index);
 
             return std::tuple<Components&...>(
                 std::get<ComponentArr<Components>&>(
@@ -37,8 +37,8 @@ public:
         size_t m_index;
 
         void skipInvalid() {
-            while (m_index < m_view->primary().entityToIndex.size()) {
-                Entity e = m_view->primary().entityToIndex.at(m_index);
+            while (m_index < m_view->primary().data.size()) {
+                Entity e = m_view->primary().getEntity(m_index);
                 if (m_view->containsAll(e)) {
                     break;
                 }
@@ -52,7 +52,7 @@ public:
     }
 
     Iterator end() {
-        return Iterator(this, primary().entityToIndex.size());
+        return Iterator(this, primary().data.size());
     }
 private:
     std::tuple<ComponentArr<Components>&...> m_componentArrs;

@@ -19,6 +19,7 @@ public:
 
     void render(const Camera& cam, View<Transform, Model>& view);
     void clearBuffer();
+    std::vector<std::string> renderLog;
 private:
     int m_width;
     int m_height;

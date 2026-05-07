@@ -3,6 +3,7 @@
 #include <chrono>
 #include <algorithm>
 #include <iostream>
+#include <sstream>
 
 Renderer::Renderer(int width, int height, float fov) : m_width(width), m_height(height), m_fov(fov) {
     m_screen = new char[m_width * m_height];
@@ -27,6 +28,8 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
         
         // std::vector<Vec2i> projectedVerts;
         // projectedVerts.reserve(model.nverts());
+
+        renderLog.push_back("Rendering model with rotation" + transform.rotation.toString());
         
         
         for (int i = 0; i < model.nfaces(); ++i) {
@@ -146,6 +149,7 @@ void Renderer::clearBuffer() {
     std::fill_n(m_zBuffer, m_width * m_height, std::numeric_limits<float>::infinity());
     m_frameBuffer.clear();
     m_frameBuffer.reserve(m_width * m_height * 20); // Reserve enough space for ANSI colored output
+    renderLog.clear();
 }
 
 Vec2 Renderer::project(Vec3 v) {
