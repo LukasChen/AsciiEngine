@@ -19,26 +19,22 @@ Renderer::~Renderer() {
     delete[] m_zBuffer;
 }
 
-void Renderer::render(const Camera& cam, const std::pair<ComponentArr<Transform>&, ComponentArr<Model>&>& componentArrs) {
+void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
     const Vec3 lightDir = gmath::normalize({0, 0.5f, -1});
 
     auto t0 = std::chrono::high_resolution_clock::now();
-    for (auto& [entity, transformIndex] : componentArrs.first.entityToIndex) {
-        const auto* model = componentArrs.second.getComponent(entity);
-        if (!model) continue;
-
-        const auto& transform = componentArrs.first.data[transformIndex];
+    for (auto [transform, model] : view) {
         
         // std::vector<Vec2i> projectedVerts;
         // projectedVerts.reserve(model.nverts());
         
         
-        for (int i = 0; i < model->nfaces(); ++i) {
+        for (int i = 0; i < model.nfaces(); ++i) {
             std::array<Vec3, 3> screenVerts;
             std::array<Vec3, 3> projectedVerts;
             bool behindCamera = false;
             for (int j = 0; j < 3; ++j) {
-                Vec3 vert = model->vert(i, j);
+                Vec3 vert = model.vert(i, j);
                 // vert = gmath::rotateY(vert, angle);
                 // vert = gmath::rotateX(vert, angle * 0.5f);
                 // vert = gmath::rotateZ(vert, angle * 0.25f);

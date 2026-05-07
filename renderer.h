@@ -9,6 +9,7 @@
 #include "model.h"
 #include "camera.h"
 #include "gameObject.h"
+#include "view.h"
 
 
 class Renderer {
@@ -16,7 +17,7 @@ public:
     Renderer(int width, int height, float fov);
     ~Renderer();
 
-    void render(const Camera& cam, const std::pair<ComponentArr<Transform>&, ComponentArr<Model>&>& gameObjects);
+    void render(const Camera& cam, View<Transform, Model>& view);
     void clearBuffer();
 private:
     int m_width;

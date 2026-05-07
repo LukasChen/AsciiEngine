@@ -17,6 +17,8 @@
 #include "camera.h"
 #include "renderer.h"
 #include "gameObject.h"
+#include "scene.h"
+#include "registry.h"
 
 #ifdef _WIN32
 #include "window_polyfill.h"
@@ -26,14 +28,12 @@ struct SinComponent {
     float startY;
 };
 
+Registry registry;
+
 const int WIDTH = 80;
 const int HEIGHT = 40;
 const float fov = 60.0f;
 
-Registry registry;
-ComponentArr<Transform> transforms;
-ComponentArr<Model> models;
-ComponentArr<SinComponent> sinComponents;
 bool parseVec3(std::istringstream& ss, Vec3& out) {
     char comma1, comma2;
     ss >> out.x >> comma1 >> out.y >> comma2 >> out.z;
@@ -71,8 +71,8 @@ Entity loadSceneFile(const std::string& filename) {
         
         try {
             Entity entity = registry.create();
-            transforms.addComponent(entity, std::move(transform));
-            models.emplaceComponent(entity, modelFilename);
+            registry.get<Transform>().addComponent(entity, std::move(transform));
+            registry.get<Model>().emplaceComponent(entity, modelFilename);
 
             // Model model(modelFilename);
             // std::cout << "Loaded model: " << modelFilename << " with position " << transform.position << "\n";
@@ -131,7 +131,7 @@ void updateCamera(Camera& cam) {
 void SinAnimSystem(ComponentArr<SinComponent>& sinComponents, ComponentArr<Transform>& transforms, float time) {
     for (auto& [entity, sinIndex] : sinComponents.entityToIndex) {
         auto& sinComp = sinComponents.data[sinIndex];
-        auto* transform = transforms.getComponent(entity);
+        auto* transform = transforms.tryGet(entity);
         if (transform) {
             transform->position.y = sinComp.startY + std::sin(time * 5) * 0.5f;
         }
@@ -147,9 +147,9 @@ int main() {
     std::cout << "\033[2J"; // Clear screen
 
     Entity count = loadSceneFile("scene.txt");
-    float startY = transforms.getComponent(1)->position.y;
-    SinComponent sinComp{startY};
-    sinComponents.addComponent(1, sinComp);
+    // float startY = scene.transforms.getComponent(1)->position.y;
+    // SinComponent sinComp{startY};
+    // scene.sinComponents.addComponent(1, sinComp);
 
     std::cout << "Loaded " << count << " objects into the scene.\n";
 
@@ -162,13 +162,15 @@ int main() {
 
     Renderer renderer(WIDTH, HEIGHT, fov);
 
+    auto test = registry.view<Transform, Model>();
+
     while (true) {
         renderer.clearBuffer();
         updateCamera(cam);
         auto t0 = std::chrono::high_resolution_clock::now();
-        renderer.render(cam, std::pair<ComponentArr<Transform>&, ComponentArr<Model>&>(transforms, models));
-        spinObjects(transforms, angle);
-        SinAnimSystem(sinComponents, transforms, time);
+        renderer.render(cam, test);
+        spinObjects(registry.get<Transform>(), angle);
+        // SinAnimSystem(registry.getComponentArray<SinComponent>(), registry.getComponentArray<Transform>(), time);
 
         auto t1 = std::chrono::high_resolution_clock::now();
         float ms = std::chrono::duration<float, std::milli>(t1 - t0).count();

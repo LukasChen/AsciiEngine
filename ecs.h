@@ -1,24 +1,17 @@
+#pragma once
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
-#pragma once
+#include <typeindex>
 using Entity = uint32_t; // Simple alias for entity IDs
 
-class Registry{
+class IComponentArray {
 public:
-    Entity create() {
-        return m_nextEntity++;
-    }
-
-    Entity getEntiityCount() const {
-        return m_nextEntity;
-    }
-private:
-    Entity m_nextEntity = 0;
+    virtual ~IComponentArray() = default;
 };
 
 template<typename T>
-class ComponentArr {
+class ComponentArr : public IComponentArray {
 public:
     std::vector<T> data;
     std::unordered_map<Entity, size_t> entityToIndex;
@@ -36,7 +29,15 @@ public:
         data.emplace_back(std::forward<Args>(args)...);
     }
 
-    T* getComponent(Entity entity) {
+    bool has(Entity entity) const {
+        return entityToIndex.find(entity) != entityToIndex.end();
+    }
+
+    T& get(Entity entity) {
+        return data[entityToIndex.at(entity)];
+    }
+
+    T* tryGet(Entity entity) {
         auto it = entityToIndex.find(entity);
         if (it != entityToIndex.end()) {
             return &data[it->second];
