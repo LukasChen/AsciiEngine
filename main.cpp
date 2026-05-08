@@ -23,6 +23,7 @@
 #include "system.h"
 #include "sinAnimSystem.h"
 #include "spinSystem.h"
+#include "primitive.h"
 
 #ifdef _WIN32
 #include "window_polyfill.h"
@@ -163,8 +164,12 @@ int main() {
     registry.get<SinComponent>().addComponent(1, SinComponent());
     auto test = registry.view<Transform, Model>();
 
+    Entity planeEntity = registry.create();
+    registry.get<Transform>().addComponent(planeEntity, Transform({0, -0.5, 0}));
+    registry.get<Model>().addComponent(planeEntity, Primitive::createPlane());
+
     BindSystem<SinAnimSystem>();
-    BindSystem<SpinSystem>();
+    // BindSystem<SpinSystem>();
     startSystems();
 
     while (true) {

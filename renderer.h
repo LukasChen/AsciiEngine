@@ -29,11 +29,11 @@ private:
     float* m_zBuffer;
     std::string m_frameBuffer; // For building output with ANSI colors
 
-    const std::string_view m_shades = " .:-=+*#%@";
+    const std::string_view m_shades = ".:-=+*#%@";
 
     // ANSI greyscale color codes for shading (from black to white)
-    static constexpr std::array<std::string_view, 10> m_shadeColors = {
-        "\033[38;5;232m", // black
+    static constexpr std::array<std::string_view, 9> m_shadeColors = {
+        // "\033[38;5;232m", // black
         "\033[38;5;235m", // very dark grey
         "\033[38;5;237m", // dark grey
         "\033[38;5;240m", // medium-dark grey
@@ -54,5 +54,7 @@ private:
     void drawPixel(int x, int y, char c);
     void drawTriangle(Vec3 a, Vec3 b, Vec3 c, float brightness);
     char getShade(float intensity);
+    Vec3 clipEdge(Vec3 a, Vec3 b);
+
     std::string getShadeWithColor(float intensity);
 };

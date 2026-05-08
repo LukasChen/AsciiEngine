@@ -44,6 +44,8 @@ struct Transform {
     Vec3 scale;
 
     Transform() : position({0, 0, 0}), rotation({0, 0, 0}), scale({1, 1, 1}) {}
+    Transform(Vec3 pos) : position(pos), rotation({0, 0, 0}), scale({1, 1, 1}) {}
+    Transform(Vec3 pos, Vec3 rot) : position(pos), rotation(rot), scale({1, 1, 1}) {}
 };
 
 std::ostream& operator<<(std::ostream& os, const Vec3& v);

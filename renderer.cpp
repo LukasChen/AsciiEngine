@@ -33,9 +33,8 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
         
         
         for (int i = 0; i < model.nfaces(); ++i) {
-            std::array<Vec3, 3> screenVerts;
-            std::array<Vec3, 3> projectedVerts;
-            bool behindCamera = false;
+            std::array<Vec3, 3> worldVerts;
+            std::array<Vec3, 3> viewVerts;
             for (int j = 0; j < 3; ++j) {
                 Vec3 vert = model.vert(i, j);
                 // vert = gmath::rotateY(vert, angle);
@@ -47,7 +46,8 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
                 vert = gmath::rotateX(vert, transform.rotation.x);
                 vert = gmath::rotateZ(vert, transform.rotation.z);
                 vert += transform.position;
-                
+
+                worldVerts[j] = vert;
                 
                 // world -> view
                 vert -= cam.position;
@@ -55,30 +55,48 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
                 vert = gmath::rotateX(vert, -cam.rotation.x);
                 vert = gmath::rotateZ(vert, -cam.rotation.z);
                 
-                screenVerts[j] = vert;
-                
-                if (screenVerts[j].z <= 0.1f) {
-                    behindCamera = true; break; 
-                }
-                // view -> projection
-                auto projected = project(screenVerts[j]);
-                projectedVerts[j] = {projected.x, projected.y, screenVerts[j].z};
+                viewVerts[j] = vert;
             }
-            if (behindCamera) continue;
             
-            Vec3 an = screenVerts[1] - screenVerts[0];
-            Vec3 bn = screenVerts[2] - screenVerts[0];
+            Vec3 an = worldVerts[1] - worldVerts[0];
+            Vec3 bn = worldVerts[2] - worldVerts[0];
             
             Vec3 normal = gmath::normalize(gmath::cross(an, bn));
             
-            // Backface cull: skip faces whose normal points away from camera (+z direction)
-            if (normal.z > 0) continue;
+            Vec3 viewDir = worldVerts[0] - cam.position;
+            // Backface cull: skip faces whose normal points away from camera
+            if (gmath::dot(normal, viewDir) >= 0) continue;
             
-            float brightness = std::max(0.0f, gmath::dot(normal, lightDir));
-            // const float ambient = 0.15f;
-            // brightness = ambient + (1.0f - ambient) * brightness;
+            float ambientBrightness = 0.25f;
             
-            drawTriangle(projectedVerts[0], projectedVerts[1], projectedVerts[2], brightness);
+            float brightness = std::max(0.0f, gmath::dot(normal, lightDir)) + ambientBrightness;
+            
+            std::array<Vec3, 4> clipped;
+            int clippedCount = 0;
+            for (int j = 0; j < 3; ++j) {
+                Vec3 p1 = viewVerts[j];
+                Vec3 p2 = viewVerts[(j + 1) % 3];
+                
+                if (p1.z > 0.1f) {
+                    clipped[clippedCount++] = p1;
+                }
+                
+                if ((p1.z > 0.1f && p2.z <= 0.1f) || (p1.z <= 0.1f && p2.z > 0.1f)) {
+                    clipped[clippedCount++] = clipEdge(p1, p2);
+                }
+            }
+
+            if (clippedCount < 3) continue;
+
+            std::array<Vec3, 4> projectedClipped;
+            for (int i = 0; i < clippedCount; ++i) {
+                auto p = project(clipped[i]);
+                projectedClipped[i] = {p.x, p.y, clipped[i].z};
+            }
+            
+            for (int j = 1; j < clippedCount - 1; ++j) {
+                drawTriangle(projectedClipped[0], projectedClipped[j], projectedClipped[j+1], brightness);
+            }
             
             // auto a = project(verts[0]);
             // auto b = project(verts[1]);
@@ -208,4 +226,13 @@ char Renderer::getShade(float intensity) {
 std::string Renderer::getShadeWithColor(float intensity) {
     int index = std::min(static_cast<int>(intensity * (m_shades.size() - 1)), static_cast<int>(m_shades.size() - 1));
     return std::string(m_shadeColors[index]) + m_shades[index] + "\033[0m";
+}
+
+Vec3 Renderer::clipEdge(Vec3 a, Vec3 b) {
+    float t = (0.1f - a.z) / (b.z - a.z);
+    return Vec3{
+        a.x + t * (b.x - a.x),
+        a.y + t * (b.y - a.y),
+        0.1f
+    };
 }

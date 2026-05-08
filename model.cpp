@@ -31,9 +31,14 @@ Model::Model(const std::string& filename) {
                 face[i++] = std::stoi(token.substr(0, token.find('/'))) - 1;
             }
             if (i == 3) m_Faces.push_back(face);
+        } else if (prefix == "vn") {
+            Vec3 n = {0, 0, 0};
+            if (iss >> n.x >> n.y >> n.z) {
+                m_Normals.push_back(n);
+            }
         }
     }
-    std::cout << "Loaded " << m_Verts.size() << " verts and " << m_Faces.size() << " faces.\n";
+    std::cout << "Loaded " << m_Verts.size() << " verts, " << m_Faces.size() << " faces, and " << m_Normals.size() << " normals.\n";
 }
 
 int Model::nverts() const { return (int)m_Verts.size(); }
@@ -45,4 +50,12 @@ Vec3 Model::vert(int i) const {
 
 Vec3 Model::vert(int iface, int nthvert) const {
     return m_Verts[m_Faces[iface][nthvert]];
+}
+
+Vec3 Model::normal(int i) const {
+    return m_Normals[i];
+}
+
+Vec3 Model::normal(int iface, int nthvert) const {
+    return m_Normals[m_Faces[iface][nthvert]];
 }

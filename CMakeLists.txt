@@ -14,6 +14,7 @@ add_executable(renderer
     math3d.cpp
     camera.cpp
     renderer.cpp
+    primitive.cpp
 )
 
 # geometry.h and model.h are header-only, so just make sure their directory is included
