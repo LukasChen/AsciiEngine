@@ -21,7 +21,7 @@ Renderer::~Renderer() {
 }
 
 void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
-    const Vec3 lightDir = gmath::normalize({0, 0.5f, -1});
+    const Vec3 lightDir = gmath::normalize({0, 1.0f, -1});
 
     auto t0 = std::chrono::high_resolution_clock::now();
     for (auto [transform, model] : view) {
@@ -35,8 +35,13 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
         for (int i = 0; i < model.nfaces(); ++i) {
             std::array<Vec3, 3> worldVerts;
             std::array<Vec3, 3> viewVerts;
+            std::array<Vec3, 3> normals;
             for (int j = 0; j < 3; ++j) {
                 Vec3 vert = model.vert(i, j);
+                normals[j] = model.normal(i, j);
+                normals[j] = gmath::rotateY(normals[j], transform.rotation.y);
+                normals[j] = gmath::rotateX(normals[j], transform.rotation.x);
+                normals[j] = gmath::rotateZ(normals[j], transform.rotation.z);
                 // vert = gmath::rotateY(vert, angle);
                 // vert = gmath::rotateX(vert, angle * 0.5f);
                 // vert = gmath::rotateZ(vert, angle * 0.25f);
@@ -65,24 +70,29 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
             
             Vec3 viewDir = worldVerts[0] - cam.position;
             // Backface cull: skip faces whose normal points away from camera
-            if (gmath::dot(normal, viewDir) >= 0) continue;
+            // if (gmath::dot(normal, viewDir) >= 0) continue;
             
-            float ambientBrightness = 0.25f;
-            
-            float brightness = std::max(0.0f, gmath::dot(normal, lightDir)) + ambientBrightness;
             
             std::array<Vec3, 4> clipped;
+            std::array<Vec3, 4> clippedNormals;
             int clippedCount = 0;
             for (int j = 0; j < 3; ++j) {
                 Vec3 p1 = viewVerts[j];
                 Vec3 p2 = viewVerts[(j + 1) % 3];
+                Vec3 n1 = normals[j];
+                Vec3 n2 = normals[(j + 1) % 3];
                 
                 if (p1.z > 0.1f) {
-                    clipped[clippedCount++] = p1;
+                    clipped[clippedCount] = p1;
+                    clippedNormals[clippedCount] = n1;
+                    clippedCount++;
                 }
                 
                 if ((p1.z > 0.1f && p2.z <= 0.1f) || (p1.z <= 0.1f && p2.z > 0.1f)) {
-                    clipped[clippedCount++] = clipEdge(p1, p2);
+                    auto clippedData = clipEdge(p1, p2, n1, n2);
+                    clipped[clippedCount] = clippedData.first;
+                    clippedNormals[clippedCount] = clippedData.second;
+                    clippedCount++;
                 }
             }
 
@@ -95,7 +105,7 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
             }
             
             for (int j = 1; j < clippedCount - 1; ++j) {
-                drawTriangle(projectedClipped[0], projectedClipped[j], projectedClipped[j+1], brightness);
+                drawTriangle(projectedClipped[0], projectedClipped[j], projectedClipped[j+1], clippedNormals[0], clippedNormals[j], clippedNormals[j+1], lightDir);
             }
             
             // auto a = project(verts[0]);
@@ -187,7 +197,7 @@ void Renderer::drawPixel(int x, int y, char c) {
     }
 }
 
-void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, float brightness) {
+void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, Vec3 lightDir) {
     // bounding box
     int minX = std::max(0, static_cast<int>(std::floor(std::min({a.x, b.x, c.x}))));
     int maxX = std::min(m_width - 1, static_cast<int>(std::ceil(std::max({a.x, b.x, c.x}))));
@@ -200,19 +210,33 @@ void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, float brightness) {
     
     for (int y = minY; y <= maxY; y++) {
         for (int x = minX; x <= maxX; x++) {
-            float w0 = (b.x - a.x) * (y - a.y) - (b.y - a.y) * (x - a.x);
-            float w1 = (c.x - b.x) * (y - b.y) - (c.y - b.y) * (x - b.x);
-            float w2 = (a.x - c.x) * (y - c.y) - (a.y - c.y) * (x - c.x);
+
+            Vec3 p{x, y, 0};
+
+            float w0 = edge(b, c, p);
+            float w1 = edge(c, a, p);
+            float w2 = edge(a, b, p);
+
+            if (!sameSign(w0, w1, w2)) continue; // Outside the triangle
+
+            float invArea = 1.0f / area;
+            w0 *= invArea;
+            w1 *= invArea;
+            w2 *= invArea;
+
+            float z = a.z * w0 + b.z * w1 + c.z * w2;
+
+            int idx = y * m_width + x;
             
-            if ((w0 >= 0 && w1 >= 0 && w2 >= 0) || (w0 <= 0 && w1 <= 0 && w2 <= 0)) {
-                // float z = (a.z * w0 + b.z * w1 + c.z * w2) / area;
-                float z = (a.z + b.z + c.z) / 3.0f; // Simple average for depth
-                
-                if (m_zBuffer[y * m_width + x] > z) {
-                    m_zBuffer[y * m_width + x] = z;
-                    m_screenBrightness[y * m_width + x] = brightness;
-                    drawPixel(x, y, getShade(brightness));
-                }
+            if (m_zBuffer[idx] > z) {
+                m_zBuffer[idx] = z;
+
+                Vec3 normal = gmath::normalize(na * w0 + nb * w1 + nc * w2);
+
+                float brightness = std::max(0.0f, gmath::dot(normal, lightDir)) + 0.25f; // Add ambient term
+
+                m_screenBrightness[idx] = brightness;
+                drawPixel(x, y, getShade(brightness));
             }
         }
     }
@@ -228,11 +252,17 @@ std::string Renderer::getShadeWithColor(float intensity) {
     return std::string(m_shadeColors[index]) + m_shades[index] + "\033[0m";
 }
 
-Vec3 Renderer::clipEdge(Vec3 a, Vec3 b) {
+std::pair<Vec3, Vec3> Renderer::clipEdge(Vec3 a, Vec3 b, Vec3 na, Vec3 nb) {
     float t = (0.1f - a.z) / (b.z - a.z);
-    return Vec3{
+    Vec3 p = {
         a.x + t * (b.x - a.x),
         a.y + t * (b.y - a.y),
         0.1f
     };
+    Vec3 n = gmath::normalize({
+        na.x + t * (nb.x - na.x),
+        na.y + t * (nb.y - na.y),
+        na.z + t * (nb.z - na.z)
+    });
+    return {p, n};
 }
