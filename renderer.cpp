@@ -29,7 +29,7 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
         // std::vector<Vec2i> projectedVerts;
         // projectedVerts.reserve(model.nverts());
 
-        renderLog.push_back("Rendering model with rotation" + transform.rotation.toString());
+        renderLog.push_back("transform:" + transform.position.toString() + "material color: " + material.color.toString());
         
         
         for (int i = 0; i < model.nfaces(); ++i) {
@@ -188,7 +188,8 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
     
     float ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
     float ms2 = std::chrono::duration<float, std::milli>(t3 - t2).count();
-    std::cout << "\nFragment time: " << ms << " ms\n";
+    // Position cursor just below the render area so debug lines don't get overwritten each frame
+    std::cout << "\033[" << (m_height + 1) << ";1HFragment time: " << ms << " ms\033[K\n";
     std::cout << "Buffer output time: " << ms2 << " ms\033[K\n";
     
 }

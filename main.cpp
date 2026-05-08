@@ -143,7 +143,7 @@ Entity loadSceneFile(const std::string& filename) {
             continue;
         }
 
-        if (!parseColor(iss, material.color)) {
+        if (!parseVec3(iss, material.color)) {
             std::cerr << "Invalid color format in line: " << line << std::endl;
             continue;
         }
@@ -277,12 +277,12 @@ int main() {
 
         auto t1 = std::chrono::high_resolution_clock::now();
         float ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
-        std::cout << "Frame: " << ms << " ms\n"; // \033[K clears the remainder of the line
+        // Print below the render area (+3 to clear renderer's own timing lines)
+        std::cout << "\033[" << (HEIGHT + 3) << ";1HFrame: " << ms << " ms\033[K\n";
+        for (size_t i = 0; i < renderer.renderLog.size(); ++i) {
+            std::cout << renderer.renderLog[i] << "\033[K\n";
+        }
         angle += 0.05f;
-        // std::cout << debugLog.size() << "\n";
-        // for (size_t i = 0; i < renderer.renderLog.size(); ++i) {
-        //     std::cout << renderer.renderLog[i] << "\n";
-        // }
 
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         time += 0.016f;
