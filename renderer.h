@@ -11,6 +11,7 @@
 #include "camera.h"
 #include "gameObject.h"
 #include "view.h"
+#include "components_type.h"
 
 
 class Renderer {
@@ -18,7 +19,7 @@ public:
     Renderer(int width, int height, float fov);
     ~Renderer();
 
-    void render(const Camera& cam, View<Transform, Model>& view);
+    void render(const Camera& cam, View<Transform, Model, Material>& view);
     void clearBuffer();
     std::vector<std::string> renderLog;
 private:
@@ -26,7 +27,7 @@ private:
     int m_height;
     float m_fov;
     char* m_screen;
-    float* m_screenBrightness; // Store brightness for ANSI color output
+    Color* m_screenBrightness; // Store brightness for ANSI color output
     float* m_zBuffer;
     std::string m_frameBuffer; // For building output with ANSI colors
 
@@ -56,14 +57,16 @@ private:
     void drawTriangle(
         Vec3 a, Vec3 b, Vec3 c,
         Vec3 na, Vec3 nb, Vec3 nc,
+        Color color,
         Vec3 lightDir 
     );
     char getShade(float intensity);
     std::pair<Vec3, Vec3> clipEdge(Vec3 a, Vec3 b, Vec3 na, Vec3 nb);
 
     std::string getShadeWithColor(float intensity);
+    std::string rgbToAnsi(Color color);
 
-    inline float edge(Vec3 a, Vec3 b, Vec3 c) {
+    inline float edge(Vec3 a, Vec3 b, Vec2i c) {
         return (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
     }
 

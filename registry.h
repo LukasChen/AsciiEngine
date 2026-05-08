@@ -10,7 +10,7 @@ public:
         return m_nextEntity++;
     }
 
-    Entity getEntiityCount() const {
+    Entity getEntitiyCount() const {
         return m_nextEntity;
     }
 

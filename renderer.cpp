@@ -7,7 +7,7 @@
 
 Renderer::Renderer(int width, int height, float fov) : m_width(width), m_height(height), m_fov(fov) {
     m_screen = new char[m_width * m_height];
-    m_screenBrightness = new float[m_width * m_height];
+    m_screenBrightness = new Color[m_width * m_height];
     m_zBuffer = new float[m_width * m_height];
     
     m_fovRad = m_fov * 0.5f * M_PI / 180.0f;
@@ -20,11 +20,11 @@ Renderer::~Renderer() {
     delete[] m_zBuffer;
 }
 
-void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
+void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view) {
     const Vec3 lightDir = gmath::normalize({0, 1.0f, -1});
 
     auto t0 = std::chrono::high_resolution_clock::now();
-    for (auto [transform, model] : view) {
+    for (auto [transform, model, material] : view) {
         
         // std::vector<Vec2i> projectedVerts;
         // projectedVerts.reserve(model.nverts());
@@ -105,7 +105,11 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
             }
             
             for (int j = 1; j < clippedCount - 1; ++j) {
-                drawTriangle(projectedClipped[0], projectedClipped[j], projectedClipped[j+1], clippedNormals[0], clippedNormals[j], clippedNormals[j+1], lightDir);
+                drawTriangle(
+                    projectedClipped[0], projectedClipped[j], projectedClipped[j+1],
+                    clippedNormals[0], clippedNormals[j], clippedNormals[j+1],
+                    material.color,
+                    lightDir);
             }
             
             // auto a = project(verts[0]);
@@ -142,17 +146,18 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
     std::cout << "\033[H";
     #endif
     
-    int currColorIdx = -1;
+    // int currColorIdx = -1;
     auto t2 = std::chrono::high_resolution_clock::now();
     for (int y = 0; y < m_height; ++y) {
         for (int x = 0; x < m_width; ++x) {
             int idx = y * m_width + x;
-            float brightness = m_screenBrightness[idx];
-            int colorIdx = std::min(static_cast<int>(std::round(brightness * (m_shades.size() - 1))), static_cast<int>(m_shades.size() - 1));
-            if (currColorIdx != colorIdx) {
-                m_frameBuffer += m_shadeColors[colorIdx];
-                currColorIdx = colorIdx;
-            }
+            Color brightness = m_screenBrightness[idx];
+            // int colorIdx = std::min(static_cast<int>(std::round((brightness.r + brightness.g + brightness.b) / 3.0f * (m_shades.size() - 1))), static_cast<int>(m_shades.size() - 1));
+            // if (currColorIdx != colorIdx) {
+            //     m_frameBuffer += m_shadeColors[colorIdx];
+            //     currColorIdx = colorIdx;
+            // }
+            m_frameBuffer += rgbToAnsi(brightness);
             m_frameBuffer += m_screen[idx];
             // output.append("\033[0m", 4);
         }
@@ -173,7 +178,7 @@ void Renderer::render(const Camera& cam, View<Transform, Model>& view) {
 
 void Renderer::clearBuffer() {
     std::fill_n(m_screen, m_width * m_height, ' ');
-    std::fill_n(m_screenBrightness, m_width * m_height, 0.0f);
+    std::fill_n(m_screenBrightness, m_width * m_height, Color{0,0,0});
     std::fill_n(m_zBuffer, m_width * m_height, std::numeric_limits<float>::infinity());
     m_frameBuffer.clear();
     m_frameBuffer.reserve(m_width * m_height * 20); // Reserve enough space for ANSI colored output
@@ -197,7 +202,7 @@ void Renderer::drawPixel(int x, int y, char c) {
     }
 }
 
-void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, Vec3 lightDir) {
+void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, Color color, Vec3 lightDir) {
     // bounding box
     int minX = std::max(0, static_cast<int>(std::floor(std::min({a.x, b.x, c.x}))));
     int maxX = std::min(m_width - 1, static_cast<int>(std::ceil(std::max({a.x, b.x, c.x}))));
@@ -211,7 +216,7 @@ void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, V
     for (int y = minY; y <= maxY; y++) {
         for (int x = minX; x <= maxX; x++) {
 
-            Vec3 p{x, y, 0};
+            Vec2i p{x, y};
 
             float w0 = edge(b, c, p);
             float w1 = edge(c, a, p);
@@ -235,7 +240,9 @@ void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, V
 
                 float brightness = std::max(0.0f, gmath::dot(normal, lightDir)) + 0.25f; // Add ambient term
 
-                m_screenBrightness[idx] = brightness;
+                Color diffuse = color * brightness;
+
+                m_screenBrightness[idx] = diffuse;
                 drawPixel(x, y, getShade(brightness));
             }
         }
@@ -265,4 +272,19 @@ std::pair<Vec3, Vec3> Renderer::clipEdge(Vec3 a, Vec3 b, Vec3 na, Vec3 nb) {
         na.z + t * (nb.z - na.z)
     });
     return {p, n};
+}
+
+std::string Renderer::rgbToAnsi(Color color) {
+    auto to255 = [](float c) {
+        c = std::clamp(c, 0.0f, 1.0f);
+        return static_cast<int>(std::round(c * 255));
+    };
+
+    // Convert RGB [0,1] to 0-255 range
+    int r = to255(color.r);
+    int g = to255(color.g);
+    int b = to255(color.b);
+
+    // Use 24-bit ANSI escape code for true color
+    return "\033[38;2;" + std::to_string(r) + ";" + std::to_string(g) + ";" + std::to_string(b) + "m";
 }

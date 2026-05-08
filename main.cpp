@@ -24,6 +24,7 @@
 #include "sinAnimSystem.h"
 #include "spinSystem.h"
 #include "primitive.h"
+#include "components_type.h"
 
 #ifdef _WIN32
 #include "window_polyfill.h"
@@ -47,6 +48,12 @@ bool parseVec3(std::istringstream& ss, Vec3& out) {
     return comma1 == ',' && comma2 == ',';
 }
 
+bool parseColor(std::istringstream& ss, Color& out) {
+    char comma1, comma2;
+    ss >> out.r >> comma1 >> out.g >> comma2 >> out.b;
+    return comma1 == ',' && comma2 == ',';
+}
+
 Entity loadSceneFile(const std::string& filename) {
     std::ifstream file(filename);
     if (!file) {
@@ -61,6 +68,7 @@ Entity loadSceneFile(const std::string& filename) {
         std::istringstream iss(line);
         std::string modelFilename;
         Transform transform;
+        Material material;
         if (!(iss >> modelFilename)) {
             std::cerr << "Invalid line in scene file: " << line << std::endl;
             continue;
@@ -75,11 +83,17 @@ Entity loadSceneFile(const std::string& filename) {
             std::cerr << "Invalid rotation format in line: " << line << std::endl;
             continue;
         }
+
+        if (!parseColor(iss, material.color)) {
+            std::cerr << "Invalid color format in line: " << line << std::endl;
+            continue;
+        }
         
         try {
             Entity entity = registry.create();
             registry.get<Transform>().addComponent(entity, std::move(transform));
             registry.get<Model>().emplaceComponent(entity, modelFilename);
+            registry.get<Material>().addComponent(entity, material);
 
             // Model model(modelFilename);
             // std::cout << "Loaded model: " << modelFilename << " with position " << transform.position << "\n";
@@ -89,7 +103,7 @@ Entity loadSceneFile(const std::string& filename) {
         }
 
     }
-    return registry.getEntiityCount();
+    return registry.getEntitiyCount();
 }
 
 void updateCamera(Camera& cam) {
@@ -162,11 +176,12 @@ int main() {
     Renderer renderer(WIDTH, HEIGHT, fov);
 
     registry.get<SinComponent>().addComponent(1, SinComponent());
-    auto test = registry.view<Transform, Model>();
+    auto test = registry.view<Transform, Model, Material>();
 
     Entity planeEntity = registry.create();
     registry.get<Transform>().addComponent(planeEntity, Transform({0, -0.5, 0}));
     registry.get<Model>().addComponent(planeEntity, Primitive::createPlane());
+    registry.get<Material>().addComponent(planeEntity, Material{{0.8f, 0.8f, 0.8f}});
 
     BindSystem<SinAnimSystem>();
     // BindSystem<SpinSystem>();

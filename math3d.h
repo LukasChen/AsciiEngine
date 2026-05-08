@@ -5,7 +5,10 @@
 #include <string>
 
 struct Vec3 {
-    float x, y, z;
+    union {
+        struct { float x, y, z; };
+        struct { float r, g, b; };
+    };
 
     Vec3& operator+=(const Vec3& other) {
         x += other.x;
@@ -48,10 +51,14 @@ struct Transform {
     Transform(Vec3 pos, Vec3 rot) : position(pos), rotation(rot), scale({1, 1, 1}) {}
 };
 
+
 std::ostream& operator<<(std::ostream& os, const Vec3& v);
 std::ostream& operator<<(std::ostream& os, const Vec2i& v);
 Vec3 operator+(const Vec3& a, const Vec3& b);
 Vec3 operator-(Vec3 a, Vec3 b);
+
+
+using Color = Vec3; // Alias for RGB color
 
 namespace gmath {
     Vec3 cross(Vec3 a, Vec3 b);
