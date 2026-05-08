@@ -4,9 +4,11 @@ project(renderer CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+if (WIN32)
 # Use GCC explicitly (optional: remove if you want CMake to pick the default compiler)
 set(CMAKE_CXX_COMPILER "C:/msys64/mingw64/bin/g++.exe")
 set(CMAKE_C_COMPILER "C:/msys64/mingw64/bin/gcc.exe")
+endif()
 
 add_executable(renderer
     main.cpp

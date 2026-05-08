@@ -24,6 +24,14 @@ struct Vec3 {
         return *this;
     }
 
+    bool operator==(Vec3 other) const {
+        return x == other.x && y == other.y && z == other.z;
+    }
+
+    bool operator!=(Vec3 other) const {
+        return x != other.x || y != other.y || z != other.z;
+    }
+
     Vec3 operator*(float scalar) const {
         return {x * scalar, y * scalar, z * scalar};
     }
@@ -39,6 +47,8 @@ struct Vec2 {
 
 struct Vec2i {
     int x, y;
+
+    Vec2i(int x, int y) : x(x), y(y) {}
 };
 
 struct Transform {
