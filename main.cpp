@@ -29,6 +29,65 @@
 
 #ifdef _WIN32
 #include "window_polyfill.h"
+#else
+#include <termios.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+void setInputMode() {
+    struct termios t;
+    tcgetattr(STDIN_FILENO, &t);
+    t.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &t);
+    fcntl(STDIN_FILENO, F_SETFL, fcntl(STDIN_FILENO, F_GETFL) | O_NONBLOCK);
+}
+
+void restoreInputMode() {
+    struct termios t;
+    tcgetattr(STDIN_FILENO, &t);
+    t.c_lflag |= ICANON | ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &t);
+}
+
+int key_w = 0, key_a = 0, key_s = 0, key_d = 0, key_q = 0, key_e = 0;
+int key_up = 0, key_down = 0, key_left = 0, key_right = 0;
+
+void pollInput() {
+    char buf[256];
+    int bytesRead = read(STDIN_FILENO, buf, sizeof(buf));
+    
+    // Decrement timers
+    if (key_w > 0) key_w--;
+    if (key_a > 0) key_a--;
+    if (key_s > 0) key_s--;
+    if (key_d > 0) key_d--;
+    if (key_q > 0) key_q--;
+    if (key_e > 0) key_e--;
+    if (key_up > 0) key_up--;
+    if (key_down > 0) key_down--;
+    if (key_left > 0) key_left--;
+    if (key_right > 0) key_right--;
+
+    for (int i = 0; i < bytesRead; i++) {
+        char c = buf[i];
+        if (c == 'w' || c == 'W') key_w = 3;
+        if (c == 's' || c == 'S') key_s = 3;
+        if (c == 'a' || c == 'A') key_a = 3;
+        if (c == 'd' || c == 'D') key_d = 3;
+        if (c == 'q' || c == 'Q') key_q = 3;
+        if (c == 'e' || c == 'E') key_e = 3;
+        if (c == '\033') { // Escape sequence
+            if (i + 2 < bytesRead && buf[i+1] == '[') {
+                char seq = buf[i+2];
+                if (seq == 'A') key_up = 3;
+                if (seq == 'B') key_down = 3;
+                if (seq == 'C') key_right = 3;
+                if (seq == 'D') key_left = 3;
+                i += 2;
+            }
+        }
+    }
+}
 #endif
 
 using loadFn = std::function<void(Registry&, std::istringstream&)>;
@@ -110,7 +169,7 @@ Entity loadSceneFile(const std::string& filename) {
             continue;
         }
 
-        if (!parseColor(iss, material.color)) {
+        if (!parseVec3(iss, material.color)) {
             std::cerr << "Invalid color format in line: " << line << std::endl;
             continue;
         }
@@ -154,6 +213,7 @@ Entity loadSceneFile(const std::string& filename) {
 }
 
 void updateCamera(Camera& cam) {
+#ifdef _WIN32
     if (GetAsyncKeyState(VK_UP) & 0x8000) {
         cam.rotation.x -= 0.05f;
     }
@@ -185,6 +245,20 @@ void updateCamera(Camera& cam) {
     if (GetAsyncKeyState('Q') & 0x8000) {
         cam.position.y -= 0.01f;
     }
+#else
+    pollInput();
+    if (key_up) cam.rotation.x -= 0.05f;
+    if (key_down) cam.rotation.x += 0.05f;
+    if (key_left) cam.rotation.y -= 0.05f;
+    if (key_right) cam.rotation.y += 0.05f;
+
+    if (key_w) cam.position += gmath::normalize(cam.forward()) * 0.1f;
+    if (key_s) cam.position += gmath::normalize(cam.forward()) * -0.1f;
+    if (key_a) cam.position += gmath::normalize(cam.right()) * -0.1f;
+    if (key_d) cam.position += gmath::normalize(cam.right()) * 0.1f;
+    if (key_e) cam.position.y += 0.01f;
+    if (key_q) cam.position.y -= 0.01f;
+#endif
 }
 
 void startSystems() {
@@ -202,9 +276,12 @@ void updateSystems(float deltaTime) {
 int main() {
 #ifdef _WIN32
     setupWindowCursor();
+#else
+    setInputMode();
 #endif
-
-    std::cout << "\033[2J"; // Clear screen
+    // Hide cursor (don't touch terminal wrap mode; some terminals handle DECAWM differently)
+    std::cout << "\033[?25l" << std::flush;
+    std::cout << "\033[H\033[2J";
 
     registerComponentType<SinComponent>("Sin");
 
@@ -213,7 +290,7 @@ int main() {
     // SinComponent sinComp{startY};
     // scene.sinComponents.addComponent(1, sinComp);
 
-    std::cout << "Loaded " << count << " objects into the scene.\n";
+    // std::cout << "Loaded " << count << " objects into the scene.\n";
 
     // std::cout << "Loading model..." << std::endl; // flush immediately
 
@@ -236,24 +313,29 @@ int main() {
     // BindSystem<SpinSystem>();
     startSystems();
 
+    std::cout << "\033[H\033[2J";
+
     while (true) {
         renderer.clearBuffer();
         updateCamera(cam);
         auto t0 = std::chrono::high_resolution_clock::now();
         updateSystems(0.016f);
         renderer.render(cam, test);
+        // std::cout << "hi" << time << std::endl;
         // SinAnimSystem(registry.getComponentArray<SinComponent>(), registry.getComponentArray<Transform>(), time);
 
         auto t1 = std::chrono::high_resolution_clock::now();
         float ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
-        std::cout << "Frame: " << ms << " ms\n";
-        angle += 0.05f;
-        // std::cout << debugLog.size() << "\n";
+        // Print below the render area (+3 to clear renderer's own timing lines)
+        std::cout << "\033[" << (HEIGHT + 3) << ";1HFrame: " << ms << " ms\033[K\n";
         for (size_t i = 0; i < renderer.renderLog.size(); ++i) {
-            std::cout << renderer.renderLog[i] << "\n";
+            std::cout << renderer.renderLog[i] << "\033[K\n";
         }
+        angle += 0.05f;
+
         std::this_thread::sleep_for(std::chrono::milliseconds(16));
         time += 0.016f;
     }
+    std::cout << "\033[?25h"; // Show cursor again before exiting
     std::cout << std::endl;
 }

@@ -139,39 +139,57 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
     //     drawPixel(projectedVerts[b].x, projectedVerts[b].y, '@');
     // }
     
-    #ifdef _WIN32
-    setCursorPosition(0, 0);
-    #else
-    std::cout << "\033[H";
-    #endif
-    
     // int currColorIdx = -1;
     auto t2 = std::chrono::high_resolution_clock::now();
+    Color lastColor{-1,-1,-1}; // Keep track of the last output color to prevent ANSI flooding
+
+    // Begin synchronized update (Kitty / VTE / xterm support DEC private mode 2026).
+    // This tells the terminal not to render until we send the closing sequence,
+    // eliminating partial-frame tearing completely.
+    // \033[?2026h = begin sync, \033[H = cursor to top-left (atomic with frame data)
+    m_frameBuffer += "\033[?2026h\033[H";
+
     for (int y = 0; y < m_height; ++y) {
         for (int x = 0; x < m_width; ++x) {
             int idx = y * m_width + x;
             Color brightness = m_screenBrightness[idx];
-            // int colorIdx = std::min(static_cast<int>(std::round((brightness.r + brightness.g + brightness.b) / 3.0f * (m_shades.size() - 1))), static_cast<int>(m_shades.size() - 1));
-            // if (currColorIdx != colorIdx) {
-            //     m_frameBuffer += m_shadeColors[colorIdx];
-            //     currColorIdx = colorIdx;
-            // }
-            m_frameBuffer += rgbToAnsi(brightness);
+            
+            // Only output ANSI escape code if the color actually changed
+            if (brightness != lastColor) {
+                m_frameBuffer += rgbToAnsi(brightness);
+                lastColor = brightness;
+            }
+            
             m_frameBuffer += m_screen[idx];
-            // output.append("\033[0m", 4);
         }
-        m_frameBuffer += '\n';
+        // \033[K erases from cursor to end-of-line, clearing any stale color/char
+        // data left over from a previous wider frame.
+        m_frameBuffer += "\033[K";
+        if (y < m_height - 1) {
+            m_frameBuffer += '\n';
+        }
     }
     
-    m_frameBuffer += "\033[0m"; // Reset color at the end
-    
+    // Reset colors, end synchronized update.
+    m_frameBuffer += "\033[0m\033[?2026l";
+
     fwrite(m_frameBuffer.data(), 1, m_frameBuffer.size(), stdout);
+    fflush(stdout);
+    // for (int y = 0; y < m_height; y++) {
+    //     for (int x = 0; x < m_width; x++) {
+    //         int idx = y * m_width + x;
+    //         std::cout << m_screen[idx];
+    //     }
+    //     std::cout << '\n';
+    // }
+    // std::cout << m_frameBuffer << std::flush; // Ensure all output is printed immediately
     auto t3 = std::chrono::high_resolution_clock::now();
     
     float ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
     float ms2 = std::chrono::duration<float, std::milli>(t3 - t2).count();
-    std::cout << "Fragment time: " << ms << " ms\n";
-    std::cout << "Buffer output time: " << ms2 << " ms\n";
+    // Position cursor just below the render area so debug lines don't get overwritten each frame
+    std::cout << "\033[" << (m_height + 1) << ";1HFragment time: " << ms << " ms\033[K\n";
+    std::cout << "Buffer output time: " << ms2 << " ms\033[K\n";
     
 }
 
@@ -182,6 +200,12 @@ void Renderer::clearBuffer() {
     m_frameBuffer.clear();
     m_frameBuffer.reserve(m_width * m_height * 20); // Reserve enough space for ANSI colored output
     renderLog.clear();
+
+    #ifdef _WIN32
+    setCursorPosition(0, 0);
+    #endif
+    // Cursor reset is prepended to the frameBuffer in render() so it's
+    // sent atomically in one fwrite — avoids cout/fwrite stream interleaving.
 }
 
 Vec2 Renderer::project(Vec3 v) {
@@ -284,6 +308,12 @@ std::string Renderer::rgbToAnsi(Color color) {
     int g = to255(color.g);
     int b = to255(color.b);
 
-    // Use 24-bit ANSI escape code for true color
-    return "\033[38;2;" + std::to_string(r) + ";" + std::to_string(g) + ";" + std::to_string(b) + "m";
+    // Use standard ANSI foreground code; some strict terminals struggle with repeated \033[38;2; sequences 
+    // flooding the channel per space character, leading to buffering jitters, desync, or spurious newlines.
+    // Try to cache color output entirely if the same color repeats, but if we must output it:
+    
+    // Instead of std::to_string repeatedly, we format an ANSI escape fast:
+    char buf[32];
+    snprintf(buf, sizeof(buf), "\033[38;2;%d;%d;%dm", r, g, b);
+    return std::string(buf);
 }
