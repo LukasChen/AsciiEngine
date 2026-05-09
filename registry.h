@@ -4,7 +4,7 @@
 #include "ecs.h"
 #include "view.h"
 
-class Registry{
+class Registry {
 public:
     Entity create() {
         return m_nextEntity++;
@@ -17,6 +17,14 @@ public:
     template<typename T>
     ComponentArr<T>& get() {
         std::type_index typeIdx(typeid(T));
+        if (componentArrays.find(typeIdx) == componentArrays.end()) {
+            componentArrays[typeIdx] = std::make_unique<ComponentArr<T>>();
+        }
+        return *static_cast<ComponentArr<T>*>(componentArrays[typeIdx].get());
+    }
+
+    template<typename T>
+    ComponentArr<T>& get(std::type_index typeIdx) {
         if (componentArrays.find(typeIdx) == componentArrays.end()) {
             componentArrays[typeIdx] = std::make_unique<ComponentArr<T>>();
         }

@@ -25,21 +25,45 @@
 #include "spinSystem.h"
 #include "primitive.h"
 #include "components_type.h"
+#include "schemaRegistry.h"
 
 #ifdef _WIN32
 #include "window_polyfill.h"
 #endif
 
+using loadFn = std::function<void(Registry&, std::istringstream&)>;
+std::unordered_map<std::string, loadFn> componentLoaders;
+
+template<typename T>
+void readComponent(T& component, std::istringstream& ss) {
+    auto& schema = SchemaRegistry::instance().get<T>();
+
+    for (auto& field : schema) {
+        field->read(&component, ss);
+    }
+}
+
+template<typename T>
+void registerComponentType(const std::string& name) {
+    componentLoaders[name] = [](Registry& registry, Entity entity, std::istringstream& ss) {
+        T component;
+        readComponent(component, ss);
+        registry.get<T>().addComponent(entity, std::move(component));
+    };
+}
+
+
 Registry registry;
 std::vector<std::unique_ptr<BaseSystem>> systems;
+
 
 template<typename T>
 void BindSystem() {
     systems.push_back(std::make_unique<T>());
 }
 
-const int WIDTH = 80;
-const int HEIGHT = 40;
+const int WIDTH = 120;
+const int HEIGHT = 60;
 const float fov = 60.0f;
 
 bool parseVec3(std::istringstream& ss, Vec3& out) {
@@ -67,6 +91,8 @@ Entity loadSceneFile(const std::string& filename) {
     while (std::getline(file, line)) {
         std::istringstream iss(line);
         std::string modelFilename;
+        Entity entity = registry.create();
+
         Transform transform;
         Material material;
         if (!(iss >> modelFilename)) {
@@ -88,9 +114,30 @@ Entity loadSceneFile(const std::string& filename) {
             std::cerr << "Invalid color format in line: " << line << std::endl;
             continue;
         }
+
+        std::string componentList;
+        if (iss >> componentList) {
+            std::string_view comSv(componentList);
+            size_t pos = 0;
+
+            while((pos = comSv.find(';')) != std::string_view::npos) {
+                std::string_view token = comSv.substr(0, pos);
+                size_t colonPos = token.find(':');
+                if (colonPos != std::string_view::npos) {
+                    std::string compName(token.substr(0, colonPos));
+                    if (componentLoaders.find(compName) != componentLoaders.end()) {
+                        std::istringstream compData(token.substr(colonPos + 1));
+                        componentLoaders[compName](registry, entity, compData);
+                    } else {
+                        std::cerr << "Unknown component: " << compName << " in line: " << line << std::endl;
+                    }
+
+                }
+                comSv.remove_prefix(pos + 1);
+            }
+        }
         
         try {
-            Entity entity = registry.create();
             registry.get<Transform>().addComponent(entity, std::move(transform));
             registry.get<Model>().emplaceComponent(entity, modelFilename);
             registry.get<Material>().addComponent(entity, material);
@@ -158,6 +205,8 @@ int main() {
 #endif
 
     std::cout << "\033[2J"; // Clear screen
+
+    registerComponentType<SinComponent>("Sin");
 
     Entity count = loadSceneFile("scene.txt");
     // float startY = scene.transforms.getComponent(1)->position.y;

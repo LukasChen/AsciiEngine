@@ -29,8 +29,6 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
         // std::vector<Vec2i> projectedVerts;
         // projectedVerts.reserve(model.nverts());
 
-        renderLog.push_back("Rendering model with rotation" + transform.rotation.toString());
-        
         
         for (int i = 0; i < model.nfaces(); ++i) {
             std::array<Vec3, 3> worldVerts;
@@ -109,7 +107,8 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
                     projectedClipped[0], projectedClipped[j], projectedClipped[j+1],
                     clippedNormals[0], clippedNormals[j], clippedNormals[j+1],
                     material.color,
-                    lightDir);
+                    lightDir
+                );
             }
             
             // auto a = project(verts[0]);
@@ -238,9 +237,9 @@ void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, C
 
                 Vec3 normal = gmath::normalize(na * w0 + nb * w1 + nc * w2);
 
-                float brightness = std::max(0.0f, gmath::dot(normal, lightDir)) + 0.25f; // Add ambient term
+                float brightness = 0.4f + (1.0f - 0.4f) * std::max(0.0f, gmath::dot(normal, lightDir)); // Add ambient term
 
-                Color diffuse = color * brightness;
+                Color diffuse = color * std::min(brightness, 1.0f); // Add ambient term
 
                 m_screenBrightness[idx] = diffuse;
                 drawPixel(x, y, getShade(brightness));

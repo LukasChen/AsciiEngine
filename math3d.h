@@ -54,6 +54,7 @@ struct Transform {
 
 std::ostream& operator<<(std::ostream& os, const Vec3& v);
 std::ostream& operator<<(std::ostream& os, const Vec2i& v);
+std::istream& operator>>(std::istream& is, Vec3& v);
 Vec3 operator+(const Vec3& a, const Vec3& b);
 Vec3 operator-(Vec3 a, Vec3 b);
 

@@ -19,6 +19,15 @@ std::ostream& operator<<(std::ostream& os, const Vec2i& v) {
     return os;
 }
 
+std::istream& operator>>(std::istream& is, Vec3& v) {
+    char comma1, comma2;
+    is >> v.x >> comma1 >> v.y >> comma2 >> v.z;
+    if (comma1 != ',' || comma2 != ',') {
+        is.setstate(std::ios::failbit);
+    }
+    return is;
+}
+
 namespace gmath {
     Vec3 cross(Vec3 a, Vec3 b) {
         return {
