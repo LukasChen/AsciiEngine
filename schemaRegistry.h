@@ -8,7 +8,7 @@
 
 struct IField {
     virtual ~IField() = default;
-    virtual void load(void* obj, std::istringstream& ss) = 0;
+    virtual void read(void* obj, std::istringstream& ss) = 0;
 };
 
 template<typename T, typename Member>
@@ -17,14 +17,14 @@ struct Field : IField {
 
     Field(Member T::* ptr) : memberPtr(ptr) {}
 
-    void load(void* obj, std::istringstream& ss) override {
+    void read(void* obj, std::istringstream& ss) override {
         T* typedObj = static_cast<T*>(obj);
         ss >> typedObj->*memberPtr;
     }
 };
 
 template<typename T, typename Member>
-IField* makeField(Member  T::* memberPtr) {
+IField* makeField(Member T::* memberPtr) {
     return new Field<T, Member>(memberPtr);
 }
 

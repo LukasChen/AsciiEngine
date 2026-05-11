@@ -13,7 +13,7 @@ protected:
     }
     void update(View<SinComponent, Transform>& view, float deltaTime) override {
         for (auto [sinComp, transform] : view) {
-            transform.position.y = sinComp.startY + std::sin(sinComp.time * 5) * 0.5f;
+            transform.position.y = sinComp.startY + std::sin(sinComp.time * sinComp.speed) * 0.5f;
             sinComp.time += deltaTime;
         }
     }

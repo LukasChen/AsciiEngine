@@ -90,7 +90,9 @@ void pollInput() {
 }
 #endif
 
-using loadFn = std::function<void(Registry&, std::istringstream&)>;
+std::vector<std::string> sceneLog;
+
+using loadFn = std::function<void(Registry&, Entity, std::istringstream*)>;
 std::unordered_map<std::string, loadFn> componentLoaders;
 
 template<typename T>
@@ -98,15 +100,18 @@ void readComponent(T& component, std::istringstream& ss) {
     auto& schema = SchemaRegistry::instance().get<T>();
 
     for (auto& field : schema) {
+        sceneLog.push_back("Reading field for component: " + std::string(typeid(T).name()));
         field->read(&component, ss);
     }
 }
 
 template<typename T>
 void registerComponentType(const std::string& name) {
-    componentLoaders[name] = [](Registry& registry, Entity entity, std::istringstream& ss) {
+    componentLoaders[name] = [](Registry& registry, Entity entity, std::istringstream* ss) {
         T component;
-        readComponent(component, ss);
+        if (ss != nullptr) {
+            readComponent(component, *ss);
+        }
         registry.get<T>().addComponent(entity, std::move(component));
     };
 }
@@ -128,12 +133,6 @@ const float fov = 60.0f;
 bool parseVec3(std::istringstream& ss, Vec3& out) {
     char comma1, comma2;
     ss >> out.x >> comma1 >> out.y >> comma2 >> out.z;
-    return comma1 == ',' && comma2 == ',';
-}
-
-bool parseColor(std::istringstream& ss, Color& out) {
-    char comma1, comma2;
-    ss >> out.r >> comma1 >> out.g >> comma2 >> out.b;
     return comma1 == ',' && comma2 == ',';
 }
 
@@ -181,16 +180,25 @@ Entity loadSceneFile(const std::string& filename) {
 
             while((pos = comSv.find(';')) != std::string_view::npos) {
                 std::string_view token = comSv.substr(0, pos);
+                sceneLog.push_back("Was?");
                 size_t colonPos = token.find(':');
                 if (colonPos != std::string_view::npos) {
                     std::string compName(token.substr(0, colonPos));
+                    sceneLog.push_back("Loading component: " + compName + " for entity: " + std::to_string(entity));
                     if (componentLoaders.find(compName) != componentLoaders.end()) {
-                        std::istringstream compData(token.substr(colonPos + 1));
-                        componentLoaders[compName](registry, entity, compData);
+                        std::istringstream compData(std::string(token.substr(colonPos + 1)));
+                        componentLoaders[compName](registry, entity, &compData);
                     } else {
                         std::cerr << "Unknown component: " << compName << " in line: " << line << std::endl;
                     }
 
+                } else {
+                    std::string compName(token);
+                    if (componentLoaders.find(compName) != componentLoaders.end()) {
+                        componentLoaders[compName](registry, entity, nullptr);
+                    } else {
+                        std::cerr << "Unknown component: " << compName << " in line: " << line << std::endl;
+                    }
                 }
                 comSv.remove_prefix(pos + 1);
             }
@@ -283,7 +291,7 @@ int main() {
     std::cout << "\033[?25l" << std::flush;
     std::cout << "\033[H\033[2J";
 
-    registerComponentType<SinComponent>("Sin");
+    registerComponentType<SinComponent>("SinAnim");
 
     Entity count = loadSceneFile("scene.txt");
     // float startY = scene.transforms.getComponent(1)->position.y;
@@ -301,7 +309,7 @@ int main() {
 
     Renderer renderer(WIDTH, HEIGHT, fov);
 
-    registry.get<SinComponent>().addComponent(1, SinComponent());
+    // registry.get<SinComponent>().addComponent(1, SinComponent());
     auto test = registry.view<Transform, Model, Material>();
 
     Entity planeEntity = registry.create();
@@ -314,6 +322,13 @@ int main() {
     startSystems();
 
     std::cout << "\033[H\033[2J";
+
+    std::ofstream logFile("scene_log.txt");
+    for (auto& log : sceneLog) {
+        logFile << log << "\n";
+    }
+    logFile << "Finished loading scene. Starting main loop...\n";
+    logFile.close();
 
     while (true) {
         renderer.clearBuffer();

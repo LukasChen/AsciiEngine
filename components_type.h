@@ -3,13 +3,15 @@
 #include "schemaRegistry.h"
 
 struct SinComponent {
+    float speed;
+    float amplitude;
     float startY;
     float time;
 };
 
 static AutoRegisterSchema<SinComponent> regSin({
-    makeField(&SinComponent::startY),
-    makeField(&SinComponent::time)
+    makeField(&SinComponent::speed),
+    makeField(&SinComponent::amplitude)
 });
 
 struct Material {
