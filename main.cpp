@@ -114,6 +114,7 @@ void registerComponentType(const std::string& name) {
         }
         registry.get<T>().addComponent(entity, std::move(component));
     };
+    sceneLog.push_back("Registered component type: " + name);
 }
 
 
@@ -173,14 +174,15 @@ Entity loadSceneFile(const std::string& filename) {
             continue;
         }
 
-        std::string componentList;
-        if (iss >> componentList) {
-            std::string_view comSv(componentList);
-            size_t pos = 0;
+        size_t linePos = iss.tellg();
+        linePos = line.find_first_not_of(' ', linePos);
+        std::string_view comSv(line.c_str() + linePos, line.size() - linePos);
+
+        if (!comSv.empty()) {
+            size_t pos = 0; // start from 1 to skip the space after color
 
             while((pos = comSv.find(';')) != std::string_view::npos) {
                 std::string_view token = comSv.substr(0, pos);
-                sceneLog.push_back("Was?");
                 size_t colonPos = token.find(':');
                 if (colonPos != std::string_view::npos) {
                     std::string compName(token.substr(0, colonPos));
@@ -190,6 +192,7 @@ Entity loadSceneFile(const std::string& filename) {
                         componentLoaders[compName](registry, entity, &compData);
                     } else {
                         std::cerr << "Unknown component: " << compName << " in line: " << line << std::endl;
+                        sceneLog.push_back("Unknown component: " + compName);
                     }
 
                 } else {
