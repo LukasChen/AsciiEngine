@@ -22,6 +22,7 @@
 #include "registry.h"
 #include "system.h"
 #include "sinAnimSystem.h"
+#include "rotateAnimSystem.h"
 #include "spinSystem.h"
 #include "primitive.h"
 #include "components_type.h"
@@ -295,6 +296,7 @@ int main() {
     std::cout << "\033[H\033[2J";
 
     registerComponentType<SinComponent>("SinAnim");
+    registerComponentType<RotateComponent>("Rotate");
 
     Entity count = loadSceneFile("scene.txt");
     // float startY = scene.transforms.getComponent(1)->position.y;
@@ -321,10 +323,15 @@ int main() {
     registry.get<Material>().addComponent(planeEntity, Material{{0.8f, 0.8f, 0.8f}});
 
     BindSystem<SinAnimSystem>();
+    BindSystem<RotateAnimSystem>();
     // BindSystem<SpinSystem>();
     startSystems();
 
     std::cout << "\033[H\033[2J";
+
+    for (auto mat : registry.get<Material>().data) {
+        sceneLog.push_back("Loaded material with color: " + mat.color.toString() + "\n");
+    }
 
     std::ofstream logFile("scene_log.txt");
     for (auto& log : sceneLog) {

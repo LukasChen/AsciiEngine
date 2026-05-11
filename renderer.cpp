@@ -21,7 +21,7 @@ Renderer::~Renderer() {
 }
 
 void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view) {
-    const Vec3 lightDir = gmath::normalize({0, 1.0f, -1});
+    const Vec3 lightDir = gmath::normalize({0, -1.0f, 1});
 
     auto t0 = std::chrono::high_resolution_clock::now();
     for (auto [transform, model, material] : view) {
@@ -107,6 +107,7 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
                     projectedClipped[0], projectedClipped[j], projectedClipped[j+1],
                     clippedNormals[0], clippedNormals[j], clippedNormals[j+1],
                     material.color,
+                    gmath::normalize(cam.forward()), 
                     lightDir
                 );
             }
@@ -225,7 +226,7 @@ void Renderer::drawPixel(int x, int y, char c) {
     }
 }
 
-void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, Color color, Vec3 lightDir) {
+void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, Color color, Vec3 camDir, Vec3 lightDir) {
     // bounding box
     int minX = std::max(0, static_cast<int>(std::floor(std::min({a.x, b.x, c.x}))));
     int maxX = std::min(m_width - 1, static_cast<int>(std::ceil(std::max({a.x, b.x, c.x}))));
@@ -259,13 +260,18 @@ void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, C
             if (m_zBuffer[idx] > z) {
                 m_zBuffer[idx] = z;
 
+                // Vec3 fragPos = a * w0 + b * w1 + c * w2;
+
                 Vec3 normal = gmath::normalize(na * w0 + nb * w1 + nc * w2);
 
-                float brightness = 0.4f + (1.0f - 0.4f) * std::max(0.0f, gmath::dot(normal, lightDir)); // Add ambient term
+                float brightness = 0.4f + (1.0f - 0.4f) * std::max(0.0f, gmath::dot(normal, -lightDir)); // Add ambient term
 
                 Color diffuse = color * std::min(brightness, 1.0f); // Add ambient term
 
-                m_screenBrightness[idx] = diffuse;
+                float shininess = 8.0f;
+                float specular = std::pow(std::max(0.0f, gmath::dot(camDir, gmath::reflect(-lightDir, normal))), shininess);
+
+                m_screenBrightness[idx] = diffuse + specular; // Combine diffuse and specular for final brightness
                 drawPixel(x, y, getShade(brightness));
             }
         }

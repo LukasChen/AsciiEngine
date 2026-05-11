@@ -58,6 +58,7 @@ private:
         Vec3 a, Vec3 b, Vec3 c,
         Vec3 na, Vec3 nb, Vec3 nc,
         Color color,
+        Vec3 camDir,
         Vec3 lightDir 
     );
     char getShade(float intensity);

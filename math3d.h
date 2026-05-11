@@ -24,6 +24,10 @@ struct Vec3 {
         return *this;
     }
 
+    Vec3 operator-() const {
+        return {-x, -y, -z};
+    }
+
     bool operator==(Vec3 other) const {
         return x == other.x && y == other.y && z == other.z;
     }
@@ -34,6 +38,10 @@ struct Vec3 {
 
     Vec3 operator*(float scalar) const {
         return {x * scalar, y * scalar, z * scalar};
+    }
+
+    Vec3 operator+(float scalar) const {
+        return {x + scalar, y + scalar, z + scalar};
     }
 
     std::string toString() const {
@@ -78,4 +86,5 @@ namespace gmath {
     Vec3 rotateX(Vec3 v, float angle);
     Vec3 rotateY(Vec3 v, float angle);
     Vec3 rotateZ(Vec3 v, float angle);
+    Vec3 reflect(Vec3 I, Vec3 normal);
 }

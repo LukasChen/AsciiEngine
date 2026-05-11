@@ -14,6 +14,14 @@ static AutoRegisterSchema<SinComponent> regSin({
     makeField(&SinComponent::amplitude)
 });
 
+struct RotateComponent {
+    float speed;
+};
+
+static AutoRegisterSchema<RotateComponent> regRotate({
+    makeField(&RotateComponent::speed)
+});
+
 struct Material {
     Color color;
 };

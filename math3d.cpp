@@ -76,4 +76,9 @@ namespace gmath {
             v.z
         };
     }
+
+    Vec3 reflect(Vec3 I, Vec3 normal) {
+        float d = dot(I, normal);
+        return I - normal * d * 2.0f;
+    }
 }
