@@ -24,6 +24,14 @@ struct Vec3 {
         return *this;
     }
 
+
+    Vec3& operator*=(const Vec3& other) {
+        x *= other.x;
+        y *= other.y;
+        z *= other.z;
+        return *this;
+    }
+
     Vec3 operator-() const {
         return {-x, -y, -z};
     }
@@ -67,6 +75,7 @@ struct Transform {
     Transform() : position({0, 0, 0}), rotation({0, 0, 0}), scale({1, 1, 1}) {}
     Transform(Vec3 pos) : position(pos), rotation({0, 0, 0}), scale({1, 1, 1}) {}
     Transform(Vec3 pos, Vec3 rot) : position(pos), rotation(rot), scale({1, 1, 1}) {}
+    Transform(Vec3 pos, Vec3 rot, Vec3 scale) : position(pos), rotation(rot), scale(scale) {}
 };
 
 

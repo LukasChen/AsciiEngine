@@ -52,17 +52,32 @@ private:
     float m_fovRad;
     float m_projectionScale;
 
+    struct ClippedVertex {
+        Vec3 viewPos;
+        Vec3 worldPos;
+        Vec3 normal;
+    };
+
+    struct V2F {
+        Vec3 viewA;
+        Vec3 viewB;
+        Vec3 viewC;
+        Vec3 worldA;
+        Vec3 worldB;
+        Vec3 worldC;
+        Vec3 normalA;
+        Vec3 normalB;
+        Vec3 normalC;
+        Color color;
+        Vec3 camPos;
+        Vec3 lightDir;
+    };
+
     Vec2 project(Vec3 v);
     void drawPixel(int x, int y, char c);
-    void drawTriangle(
-        Vec3 a, Vec3 b, Vec3 c,
-        Vec3 na, Vec3 nb, Vec3 nc,
-        Color color,
-        Vec3 camDir,
-        Vec3 lightDir 
-    );
+    void drawTriangle(const V2F& v2f);
     char getShade(float intensity);
-    std::pair<Vec3, Vec3> clipEdge(Vec3 a, Vec3 b, Vec3 na, Vec3 nb);
+    ClippedVertex clipEdge(Vec3 viewA, Vec3 viewB, Vec3 worldA, Vec3 worldB, Vec3 normalA, Vec3 normalB);
 
     std::string getShadeWithColor(float intensity);
     std::string rgbToAnsi(Color color);

@@ -12,6 +12,7 @@
 #include <string_view>
 #include <fstream>
 #include <sstream>
+#include <charconv>
 #include "math3d.h"
 #include "ecs.h"
 #include "model.h"
@@ -27,6 +28,7 @@
 #include "primitive.h"
 #include "components_type.h"
 #include "schemaRegistry.h"
+#include "parser.h"
 
 #ifdef _WIN32
 #include "window_polyfill.h"
@@ -93,25 +95,25 @@ void pollInput() {
 
 std::vector<std::string> sceneLog;
 
-using loadFn = std::function<void(Registry&, Entity, std::istringstream*)>;
+using loadFn = std::function<void(Registry&, Entity, std::string_view*)>;
 std::unordered_map<std::string, loadFn> componentLoaders;
 
 template<typename T>
-void readComponent(T& component, std::istringstream& ss) {
+void readComponent(T& component, std::string_view& sv) {
     auto& schema = SchemaRegistry::instance().get<T>();
 
     for (auto& field : schema) {
         sceneLog.push_back("Reading field for component: " + std::string(typeid(T).name()));
-        field->read(&component, ss);
+        field->read(&component, sv);
     }
 }
 
 template<typename T>
 void registerComponentType(const std::string& name) {
-    componentLoaders[name] = [](Registry& registry, Entity entity, std::istringstream* ss) {
+    componentLoaders[name] = [](Registry& registry, Entity entity, std::string_view* sv) {
         T component;
-        if (ss != nullptr) {
-            readComponent(component, *ss);
+        if (sv != nullptr) {
+            readComponent(component, *sv);
         }
         registry.get<T>().addComponent(entity, std::move(component));
     };
@@ -128,14 +130,40 @@ void BindSystem() {
     systems.push_back(std::make_unique<T>());
 }
 
-const int WIDTH = 120;
-const int HEIGHT = 60;
+const int WIDTH = 100;
+const int HEIGHT = 50;
 const float fov = 60.0f;
 
-bool parseVec3(std::istringstream& ss, Vec3& out) {
-    char comma1, comma2;
-    ss >> out.x >> comma1 >> out.y >> comma2 >> out.z;
-    return comma1 == ',' && comma2 == ',';
+
+bool parseString(std::string_view& sv, std::string& out) {
+    while (!sv.empty() && std::isspace(sv.front())) sv.remove_prefix(1);
+    size_t endPos = sv.find_first_of(' ');
+    out = std::string(sv.substr(0, endPos));
+    if (endPos != std::string_view::npos) {
+        sv.remove_prefix(endPos);
+    } else {
+        sv.remove_prefix(sv.size());
+    }
+    return true;
+}
+
+bool parseFloat(std::string_view& sv, float& out) {
+    while(!sv.empty() && (std::isspace(sv.front()) || sv.front() == ',')) sv.remove_prefix(1);
+
+    const char* begin = sv.data();
+    const char* end = begin + sv.size();
+
+    auto [ptr, ec] = std::from_chars(begin, end, out);
+    if (ec != std::errc()) {
+        return false;
+    } 
+
+    sv.remove_prefix(ptr - begin);
+    return true;
+}
+
+bool parseVec3(std::string_view& sv, Vec3& out) {
+    return parseFloat(sv, out.x) && parseFloat(sv, out.y) && parseFloat(sv, out.z);
 }
 
 Entity loadSceneFile(const std::string& filename) {
@@ -149,47 +177,46 @@ Entity loadSceneFile(const std::string& filename) {
     std::string line;
     std::vector<GameObject> sceneObjects;
     while (std::getline(file, line)) {
-        std::istringstream iss(line);
-        std::string modelFilename;
+        std::string_view sv(line);
         Entity entity = registry.create();
 
+        std::string modelFilename;
         Transform transform;
         Material material;
-        if (!(iss >> modelFilename)) {
-            std::cerr << "Invalid line in scene file: " << line << std::endl;
+        if (!parseString(sv, modelFilename)) {
+            sceneLog.push_back("Invalid line in scene file: " + line);
             continue;
         }
 
-        if (!parseVec3(iss, transform.position)) {
-            std::cerr << "Invalid position format in line: " << line << std::endl;
+        if (!parseVec3(sv, transform.position)) {
+            sceneLog.push_back("Invalid position format in line: " + line);
             continue;
         }
 
-        if (!parseVec3(iss, transform.rotation)) {
-            std::cerr << "Invalid rotation format in line: " << line << std::endl;
+        if (!parseVec3(sv, transform.rotation)) {
+            sceneLog.push_back("Invalid rotation format in line: " + line);
             continue;
         }
 
-        if (!parseVec3(iss, material.color)) {
-            std::cerr << "Invalid color format in line: " << line << std::endl;
+        if (!parseVec3(sv, material.color)) {
+            sceneLog.push_back("Invalid color format in line: " + line);
             continue;
         }
 
-        size_t linePos = iss.tellg();
-        linePos = line.find_first_not_of(' ', linePos);
-        std::string_view comSv(line.c_str() + linePos, line.size() - linePos);
+        sceneLog.push_back("Loaded entity: " + std::to_string(entity) + " with model: " + modelFilename);
 
-        if (!comSv.empty()) {
+        if (!sv.empty()) {
+            sv.remove_prefix(1); // Remove space before components
             size_t pos = 0; // start from 1 to skip the space after color
 
-            while((pos = comSv.find(';')) != std::string_view::npos) {
-                std::string_view token = comSv.substr(0, pos);
+            while((pos = sv.find(';')) != std::string_view::npos) {
+                std::string_view token = sv.substr(0, pos);
                 size_t colonPos = token.find(':');
                 if (colonPos != std::string_view::npos) {
                     std::string compName(token.substr(0, colonPos));
                     sceneLog.push_back("Loading component: " + compName + " for entity: " + std::to_string(entity));
                     if (componentLoaders.find(compName) != componentLoaders.end()) {
-                        std::istringstream compData(std::string(token.substr(colonPos + 1)));
+                        std::string_view compData(token.substr(colonPos + 1));
                         componentLoaders[compName](registry, entity, &compData);
                     } else {
                         std::cerr << "Unknown component: " << compName << " in line: " << line << std::endl;
@@ -204,7 +231,7 @@ Entity loadSceneFile(const std::string& filename) {
                         std::cerr << "Unknown component: " << compName << " in line: " << line << std::endl;
                     }
                 }
-                comSv.remove_prefix(pos + 1);
+                sv.remove_prefix(pos + 1);
             }
         }
         
@@ -322,16 +349,17 @@ int main() {
     registry.get<Model>().addComponent(planeEntity, Primitive::createPlane());
     registry.get<Material>().addComponent(planeEntity, Material{{0.8f, 0.8f, 0.8f}});
 
+    // Entity sphereEntity = registry.create();
+    // registry.get<Transform>().addComponent(sphereEntity, Transform({0, 0.5, 0}, {0, 0, 0}, {0.5f, 0.5f, 0.5f}));
+    // registry.get<Model>().addComponent(sphereEntity, Primitive::createSphere(16));
+    // registry.get<Material>().addComponent(sphereEntity, Material{{1.0f, 1.0f, 0.0f}});
+
     BindSystem<SinAnimSystem>();
     BindSystem<RotateAnimSystem>();
     // BindSystem<SpinSystem>();
     startSystems();
 
     std::cout << "\033[H\033[2J";
-
-    for (auto mat : registry.get<Material>().data) {
-        sceneLog.push_back("Loaded material with color: " + mat.color.toString() + "\n");
-    }
 
     std::ofstream logFile("scene_log.txt");
     for (auto& log : sceneLog) {
@@ -352,7 +380,7 @@ int main() {
         auto t1 = std::chrono::high_resolution_clock::now();
         float ms = std::chrono::duration<float, std::milli>(t1 - t0).count();
         // Print below the render area (+3 to clear renderer's own timing lines)
-        std::cout << "\033[" << (HEIGHT + 3) << ";1HFrame: " << ms << " ms\033[K\n";
+        std::cout << "\033[" << (HEIGHT + 4) << ";1HFrame: " << ms << " ms\033[K\n";
         for (size_t i = 0; i < renderer.renderLog.size(); ++i) {
             std::cout << renderer.renderLog[i] << "\033[K\n";
         }

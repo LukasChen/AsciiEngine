@@ -48,6 +48,7 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
                 vert = gmath::rotateY(vert, transform.rotation.y);
                 vert = gmath::rotateX(vert, transform.rotation.x);
                 vert = gmath::rotateZ(vert, transform.rotation.z);
+                vert *= transform.scale;
                 vert += transform.position;
 
                 worldVerts[j] = vert;
@@ -61,35 +62,30 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
                 viewVerts[j] = vert;
             }
             
-            Vec3 an = worldVerts[1] - worldVerts[0];
-            Vec3 bn = worldVerts[2] - worldVerts[0];
-            
-            Vec3 normal = gmath::normalize(gmath::cross(an, bn));
-            
-            Vec3 viewDir = worldVerts[0] - cam.position;
-            // Backface cull: skip faces whose normal points away from camera
-            // if (gmath::dot(normal, viewDir) >= 0) continue;
-            
-            
             std::array<Vec3, 4> clipped;
+            std::array<Vec3, 4> clippedWorld;
             std::array<Vec3, 4> clippedNormals;
             int clippedCount = 0;
             for (int j = 0; j < 3; ++j) {
                 Vec3 p1 = viewVerts[j];
                 Vec3 p2 = viewVerts[(j + 1) % 3];
+                Vec3 w1 = worldVerts[j];
+                Vec3 w2 = worldVerts[(j + 1) % 3];
                 Vec3 n1 = normals[j];
                 Vec3 n2 = normals[(j + 1) % 3];
                 
                 if (p1.z > 0.1f) {
                     clipped[clippedCount] = p1;
+                    clippedWorld[clippedCount] = w1;
                     clippedNormals[clippedCount] = n1;
                     clippedCount++;
                 }
                 
                 if ((p1.z > 0.1f && p2.z <= 0.1f) || (p1.z <= 0.1f && p2.z > 0.1f)) {
-                    auto clippedData = clipEdge(p1, p2, n1, n2);
-                    clipped[clippedCount] = clippedData.first;
-                    clippedNormals[clippedCount] = clippedData.second;
+                    ClippedVertex clippedData = clipEdge(p1, p2, w1, w2, n1, n2);
+                    clipped[clippedCount] = clippedData.viewPos;
+                    clippedWorld[clippedCount] = clippedData.worldPos;
+                    clippedNormals[clippedCount] = clippedData.normal;
                     clippedCount++;
                 }
             }
@@ -103,13 +99,21 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
             }
             
             for (int j = 1; j < clippedCount - 1; ++j) {
-                drawTriangle(
-                    projectedClipped[0], projectedClipped[j], projectedClipped[j+1],
-                    clippedNormals[0], clippedNormals[j], clippedNormals[j+1],
-                    material.color,
-                    gmath::normalize(cam.forward()), 
-                    lightDir
-                );
+                V2F v2f = {
+                    .viewA = projectedClipped[0],
+                    .viewB = projectedClipped[j],
+                    .viewC = projectedClipped[j+1],
+                    .worldA = clippedWorld[0],
+                    .worldB = clippedWorld[j],
+                    .worldC = clippedWorld[j+1],
+                    .normalA = clippedNormals[0],
+                    .normalB = clippedNormals[j],
+                    .normalC = clippedNormals[j+1],
+                    .color = material.color,
+                    .camPos = cam.position,
+                    .lightDir = lightDir
+                };
+                drawTriangle(v2f);
             }
             
             // auto a = project(verts[0]);
@@ -191,6 +195,7 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
     // Position cursor just below the render area so debug lines don't get overwritten each frame
     std::cout << "\033[" << (m_height + 1) << ";1HFragment time: " << ms << " ms\033[K\n";
     std::cout << "Buffer output time: " << ms2 << " ms\033[K\n";
+    std::cout << "Frame Buffer size: " << m_frameBuffer.size() << " bytes\033[K\n";
     
 }
 
@@ -199,7 +204,7 @@ void Renderer::clearBuffer() {
     std::fill_n(m_screenBrightness, m_width * m_height, Color{0,0,0});
     std::fill_n(m_zBuffer, m_width * m_height, std::numeric_limits<float>::infinity());
     m_frameBuffer.clear();
-    m_frameBuffer.reserve(m_width * m_height * 20); // Reserve enough space for ANSI colored output
+    m_frameBuffer.reserve(m_width * m_height * 2); // Reserve enough space for ANSI colored output
     renderLog.clear();
 
     #ifdef _WIN32
@@ -226,53 +231,61 @@ void Renderer::drawPixel(int x, int y, char c) {
     }
 }
 
-void Renderer::drawTriangle(Vec3 a, Vec3 b, Vec3 c, Vec3 na, Vec3 nb, Vec3 nc, Color color, Vec3 camDir, Vec3 lightDir) {
+void Renderer::drawTriangle(const V2F& v2f) {
     // bounding box
-    int minX = std::max(0, static_cast<int>(std::floor(std::min({a.x, b.x, c.x}))));
-    int maxX = std::min(m_width - 1, static_cast<int>(std::ceil(std::max({a.x, b.x, c.x}))));
-    int minY = std::max(0, static_cast<int>(std::floor(std::min({a.y, b.y, c.y}))));
-    int maxY = std::min(m_height - 1, static_cast<int>(std::ceil(std::max({a.y, b.y, c.y}))));
+    int minX = std::max(0, static_cast<int>(std::floor(std::min({v2f.viewA.x, v2f.viewB.x, v2f.viewC.x}))));
+    int maxX = std::min(m_width - 1, static_cast<int>(std::ceil(std::max({v2f.viewA.x, v2f.viewB.x, v2f.viewC.x}))));
+    int minY = std::max(0, static_cast<int>(std::floor(std::min({v2f.viewA.y, v2f.viewB.y, v2f.viewC.y}))));
+    int maxY = std::min(m_height - 1, static_cast<int>(std::ceil(std::max({v2f.viewA.y, v2f.viewB.y, v2f.viewC.y}))));
     
     
-    float area = (b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x);
+    float area = (v2f.viewB.x - v2f.viewA.x) * (v2f.viewC.y - v2f.viewA.y) - (v2f.viewB.y - v2f.viewA.y) * (v2f.viewC.x - v2f.viewA.x);
     if (area == 0) return; // Degenerate triangle
     
+    float invArea = 1.0f / area;
+
     for (int y = minY; y <= maxY; y++) {
         for (int x = minX; x <= maxX; x++) {
 
             Vec2i p{x, y};
 
-            float w0 = edge(b, c, p);
-            float w1 = edge(c, a, p);
-            float w2 = edge(a, b, p);
+            float w0 = edge(v2f.viewB, v2f.viewC, p);
+            float w1 = edge(v2f.viewC, v2f.viewA, p);
+            float w2 = edge(v2f.viewA, v2f.viewB, p);
 
             if (!sameSign(w0, w1, w2)) continue; // Outside the triangle
 
-            float invArea = 1.0f / area;
             w0 *= invArea;
             w1 *= invArea;
             w2 *= invArea;
 
-            float z = a.z * w0 + b.z * w1 + c.z * w2;
+            float z = v2f.viewA.z * w0 + v2f.viewB.z * w1 + v2f.viewC.z * w2;
 
             int idx = y * m_width + x;
             
             if (m_zBuffer[idx] > z) {
                 m_zBuffer[idx] = z;
 
-                // Vec3 fragPos = a * w0 + b * w1 + c * w2;
+                Vec3 fragPos = v2f.worldA * w0 + v2f.worldB * w1 + v2f.worldC * w2;
+                Vec3 camDir = gmath::normalize(v2f.camPos - fragPos);
 
-                Vec3 normal = gmath::normalize(na * w0 + nb * w1 + nc * w2);
+                Vec3 normal = gmath::normalize(v2f.normalA * w0 + v2f.normalB * w1 + v2f.normalC * w2);
 
-                float brightness = 0.4f + (1.0f - 0.4f) * std::max(0.0f, gmath::dot(normal, -lightDir)); // Add ambient term
+                float ambient = 0.4f;
+                float diffuse = std::max(0.0f, gmath::dot(normal, -v2f.lightDir));
+                float lit = ambient + (1.0f - ambient) * diffuse;
 
-                Color diffuse = color * std::min(brightness, 1.0f); // Add ambient term
+                float shininess = 32.0f;
+                float specular = 0.0f;
+                if (diffuse > 0.0f) {
+                    Vec3 reflected = gmath::reflect(v2f.lightDir, normal);
+                    specular = std::pow(std::max(0.0f, gmath::dot(camDir, reflected)), shininess);
+                }
 
-                float shininess = 8.0f;
-                float specular = std::pow(std::max(0.0f, gmath::dot(camDir, gmath::reflect(-lightDir, normal))), shininess);
+                float shade = std::clamp(lit + specular, 0.0f, 1.0f);
 
-                m_screenBrightness[idx] = diffuse + specular; // Combine diffuse and specular for final brightness
-                drawPixel(x, y, getShade(brightness));
+                m_screenBrightness[idx] = v2f.color * lit + Color{1.0f, 1.0f, 1.0f} * specular;
+                drawPixel(x, y, getShade(shade));
             }
         }
     }
@@ -288,19 +301,24 @@ std::string Renderer::getShadeWithColor(float intensity) {
     return std::string(m_shadeColors[index]) + m_shades[index] + "\033[0m";
 }
 
-std::pair<Vec3, Vec3> Renderer::clipEdge(Vec3 a, Vec3 b, Vec3 na, Vec3 nb) {
-    float t = (0.1f - a.z) / (b.z - a.z);
-    Vec3 p = {
-        a.x + t * (b.x - a.x),
-        a.y + t * (b.y - a.y),
+Renderer::ClippedVertex Renderer::clipEdge(Vec3 viewA, Vec3 viewB, Vec3 worldA, Vec3 worldB, Vec3 normalA, Vec3 normalB) {
+    float t = (0.1f - viewA.z) / (viewB.z - viewA.z);
+    Vec3 clippedView = {
+        viewA.x + t * (viewB.x - viewA.x),
+        viewA.y + t * (viewB.y - viewA.y),
         0.1f
     };
-    Vec3 n = gmath::normalize({
-        na.x + t * (nb.x - na.x),
-        na.y + t * (nb.y - na.y),
-        na.z + t * (nb.z - na.z)
+    Vec3 clippedWorld = {
+        worldA.x + t * (worldB.x - worldA.x),
+        worldA.y + t * (worldB.y - worldA.y),
+        worldA.z + t * (worldB.z - worldA.z)
+    };
+    Vec3 clippedNormal = gmath::normalize({
+        normalA.x + t * (normalB.x - normalA.x),
+        normalA.y + t * (normalB.y - normalA.y),
+        normalA.z + t * (normalB.z - normalA.z)
     });
-    return {p, n};
+    return {clippedView, clippedWorld, clippedNormal};
 }
 
 std::string Renderer::rgbToAnsi(Color color) {

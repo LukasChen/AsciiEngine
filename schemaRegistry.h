@@ -5,10 +5,11 @@
 #include <memory>
 #include "ecs.h"
 #include "registry.h"
+#include "parser.h"
 
 struct IField {
     virtual ~IField() = default;
-    virtual void read(void* obj, std::istringstream& ss) = 0;
+    virtual void read(void* obj, std::string_view& sv) = 0;
 };
 
 template<typename T, typename Member>
@@ -17,9 +18,9 @@ struct Field : IField {
 
     Field(Member T::* ptr) : memberPtr(ptr) {}
 
-    void read(void* obj, std::istringstream& ss) override {
+    void read(void* obj, std::string_view& sv) override {
         T* typedObj = static_cast<T*>(obj);
-        ss >> typedObj->*memberPtr;
+        Parser::parse<Member>(sv, typedObj->*memberPtr);
     }
 };
 
