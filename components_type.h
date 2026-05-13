@@ -29,3 +29,11 @@ struct Material {
 static AutoRegisterSchema<Material> regMaterial({
     makeField(&Material::color)
 });
+
+struct Collider {
+    Vec3 size;
+};
+
+struct Rigidbody {
+    Vec3 velocity;
+};
