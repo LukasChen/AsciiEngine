@@ -29,6 +29,8 @@
 #include "components_type.h"
 #include "schemaRegistry.h"
 #include "parser.h"
+#include "physicSystem.h"
+#include "logger.h"
 
 #ifdef _WIN32
 #include "window_polyfill.h"
@@ -111,7 +113,7 @@ void readComponent(T& component, std::string_view& sv) {
 template<typename T>
 void registerComponentType(const std::string& name) {
     componentLoaders[name] = [](Registry& registry, Entity entity, std::string_view* sv) {
-        T component;
+        T component{};
         if (sv != nullptr) {
             readComponent(component, *sv);
         }
@@ -130,8 +132,8 @@ void BindSystem() {
     systems.push_back(std::make_unique<T>());
 }
 
-const int WIDTH = 100;
-const int HEIGHT = 50;
+const int WIDTH = 80;
+const int HEIGHT = 40;
 const float fov = 60.0f;
 
 
@@ -324,11 +326,15 @@ int main() {
 
     registerComponentType<SinComponent>("SinAnim");
     registerComponentType<RotateComponent>("Rotate");
+    registerComponentType<Collider>("Collider");
+    registerComponentType<Rigidbody>("Rigidbody");
 
     Entity count = loadSceneFile("scene.txt");
     // float startY = scene.transforms.getComponent(1)->position.y;
     // SinComponent sinComp{startY};
     // scene.sinComponents.addComponent(1, sinComp);
+
+    Logger::init("scene_log.txt");
 
     // std::cout << "Loaded " << count << " objects into the scene.\n";
 
@@ -348,25 +354,18 @@ int main() {
     registry.get<Transform>().addComponent(planeEntity, Transform({0, -0.5, 0}));
     registry.get<Model>().addComponent(planeEntity, Primitive::createPlane());
     registry.get<Material>().addComponent(planeEntity, Material{{0.8f, 0.8f, 0.8f}});
+    registry.get<Collider>().addComponent(planeEntity, Collider{{10.0f, 0.01f, 10.0f}});
+    registry.get<Rigidbody>().addComponent(planeEntity, Rigidbody{.isStatic = true});
 
-    // Entity sphereEntity = registry.create();
-    // registry.get<Transform>().addComponent(sphereEntity, Transform({0, 0.5, 0}, {0, 0, 0}, {0.5f, 0.5f, 0.5f}));
-    // registry.get<Model>().addComponent(sphereEntity, Primitive::createSphere(16));
-    // registry.get<Material>().addComponent(sphereEntity, Material{{1.0f, 1.0f, 0.0f}});
 
     BindSystem<SinAnimSystem>();
     BindSystem<RotateAnimSystem>();
+    BindSystem<PhysicsSystem>();
     // BindSystem<SpinSystem>();
     startSystems();
 
     std::cout << "\033[H\033[2J";
 
-    std::ofstream logFile("scene_log.txt");
-    for (auto& log : sceneLog) {
-        logFile << log << "\n";
-    }
-    logFile << "Finished loading scene. Starting main loop...\n";
-    logFile.close();
 
     while (true) {
         renderer.clearBuffer();
@@ -391,4 +390,6 @@ int main() {
     }
     std::cout << "\033[?25h"; // Show cursor again before exiting
     std::cout << std::endl;
+
+    Logger::close();
 }

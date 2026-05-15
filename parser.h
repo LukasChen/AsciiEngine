@@ -2,6 +2,7 @@
 #include <string_view>
 #include <charconv>
 #include <string>
+#include <cctype>
 
 template<typename T>
 struct ParseTraits;
@@ -42,6 +43,45 @@ struct ParseTraits<Vec3> {
         return ParseTraits<float>::parse(sv, out.x) &&
                ParseTraits<float>::parse(sv, out.y) &&
                ParseTraits<float>::parse(sv, out.z);
+    }
+};
+
+template<>
+struct ParseTraits<bool> {
+    static bool parse(std::string_view& sv, bool& out) {
+        auto hasPrefix = [](std::string_view value, std::string_view prefix) {
+            return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
+        };
+
+        while (!sv.empty() && (std::isspace(static_cast<unsigned char>(sv.front())) || sv.front() == ',')) {
+            sv.remove_prefix(1);
+        }
+
+        if (hasPrefix(sv, "true")) {
+            out = true;
+            sv.remove_prefix(4);
+            return true;
+        }
+
+        if (hasPrefix(sv, "false")) {
+            out = false;
+            sv.remove_prefix(5);
+            return true;
+        }
+
+        if (hasPrefix(sv, "1")) {
+            out = true;
+            sv.remove_prefix(1);
+            return true;
+        }
+
+        if (hasPrefix(sv, "0")) {
+            out = false;
+            sv.remove_prefix(1);
+            return true;
+        }
+
+        return false;
     }
 };
 

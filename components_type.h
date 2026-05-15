@@ -34,6 +34,15 @@ struct Collider {
     Vec3 size;
 };
 
+static AutoRegisterSchema<Collider> regCollider({
+    makeField(&Collider::size)
+});
+
 struct Rigidbody {
-    Vec3 velocity;
+    Vec3 velocity{0.0f, 0.0f, 0.0f};
+    bool isStatic = false;
 };
+
+static AutoRegisterSchema<Rigidbody> regRigidbody({
+    makeField(&Rigidbody::isStatic)
+});

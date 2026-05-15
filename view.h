@@ -1,9 +1,12 @@
 #pragma once
+#include <tuple>
 #include "ecs.h"
 
 template<typename... Components>
 class View {
 public:
+    using value_type = std::tuple<Components&...>;
+
     View(ComponentArr<Components>&... componentsArrs) : m_componentArrs(componentsArrs...) {}
 
     class Iterator {
@@ -12,18 +15,20 @@ public:
             skipInvalid();
         }
 
-        auto operator*() {
-            Entity e = m_view->primary().getEntity(m_index);
+        template<typename Component>
+        Component& get() {
+            return std::get<ComponentArr<Component>&>(m_view->m_componentArrs).get(currentEntity());
+        }
 
-            return std::tuple<Components&...>(
-                std::get<ComponentArr<Components>&>(
-                    m_view->m_componentArrs
-                ).get(e)...
+        value_type operator*() {
+            Entity entity = currentEntity();
+            return value_type(
+                std::get<ComponentArr<Components>&>(m_view->m_componentArrs).get(entity)...
             );
         }
 
         Iterator& operator++() {
-            m_index++;
+            ++m_index;
             skipInvalid();
             return *this;
         }
@@ -36,13 +41,17 @@ public:
         View* m_view;
         size_t m_index;
 
+        Entity currentEntity() const {
+            return m_view->primary().getEntity(m_index);
+        }
+
         void skipInvalid() {
             while (m_index < m_view->primary().data.size()) {
-                Entity e = m_view->primary().getEntity(m_index);
-                if (m_view->containsAll(e)) {
+                Entity entity = currentEntity();
+                if (m_view->containsAll(entity)) {
                     break;
                 }
-                m_index++;
+                ++m_index;
             }
         }
     };
@@ -54,6 +63,8 @@ public:
     Iterator end() {
         return Iterator(this, primary().data.size());
     }
+
+    
 private:
     std::tuple<ComponentArr<Components>&...> m_componentArrs;
 
