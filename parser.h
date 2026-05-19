@@ -48,11 +48,10 @@ struct ParseTraits<Vec3> {
 
 template<>
 struct ParseTraits<bool> {
+    static bool hasPrefix(std::string_view value, std::string_view prefix) {
+        return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
+    }
     static bool parse(std::string_view& sv, bool& out) {
-        auto hasPrefix = [](std::string_view value, std::string_view prefix) {
-            return value.size() >= prefix.size() && value.substr(0, prefix.size()) == prefix;
-        };
-
         while (!sv.empty() && (std::isspace(static_cast<unsigned char>(sv.front())) || sv.front() == ',')) {
             sv.remove_prefix(1);
         }

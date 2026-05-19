@@ -40,9 +40,15 @@ static AutoRegisterSchema<Collider> regCollider({
 
 struct Rigidbody {
     Vec3 velocity{0.0f, 0.0f, 0.0f};
+    Vec3 angularVelocity{0.0f, 0.0f, 0.0f};
     bool isStatic = false;
 };
 
 static AutoRegisterSchema<Rigidbody> regRigidbody({
     makeField(&Rigidbody::isStatic)
 });
+
+struct Camera {
+    float moveSpeed = 5.0f;
+    float lookSpeed = 5.0f;
+};

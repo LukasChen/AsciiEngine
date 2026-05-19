@@ -8,7 +8,6 @@
 #include "ecs.h"
 #include "math3d.h"
 #include "model.h"
-#include "camera.h"
 #include "gameObject.h"
 #include "view.h"
 #include "components_type.h"
@@ -16,10 +15,10 @@
 
 class Renderer {
 public:
-    Renderer(int width, int height, float fov);
+    Renderer(int width, int height, float fov, Transform& camTrans);
     ~Renderer();
 
-    void render(const Camera& cam, View<Transform, Model, Material>& view);
+    void render(View<Transform, Model, Material>& view);
     void clearBuffer();
     std::vector<std::string> renderLog;
 private:
@@ -51,6 +50,7 @@ private:
 
     float m_fovRad;
     float m_projectionScale;
+    Transform& m_cam;
 
     struct ClippedVertex {
         Vec3 viewPos;
@@ -69,7 +69,6 @@ private:
         Vec3 normalB;
         Vec3 normalC;
         Color color;
-        Vec3 camPos;
         Vec3 lightDir;
     };
 

@@ -8,7 +8,6 @@ public:
     Vec3 rotation;
 
     Camera(Vec3 pos) : position(pos), rotation({0, 0, 0}) {}
-    void pingpong();
     Vec3 forward() const;
     Vec3 right() const {
         Vec3 fwd = forward();

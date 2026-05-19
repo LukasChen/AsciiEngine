@@ -5,7 +5,7 @@
 #include <iostream>
 #include <sstream>
 
-Renderer::Renderer(int width, int height, float fov) : m_width(width), m_height(height), m_fov(fov) {
+Renderer::Renderer(int width, int height, float fov, Transform& camTrans) : m_width(width), m_height(height), m_fov(fov), m_cam(camTrans) {
     m_screen = new char[m_width * m_height];
     m_screenBrightness = new Color[m_width * m_height];
     m_zBuffer = new float[m_width * m_height];
@@ -20,7 +20,7 @@ Renderer::~Renderer() {
     delete[] m_zBuffer;
 }
 
-void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view) {
+void Renderer::render(View<Transform, Model, Material>& view) {
     const Vec3 lightDir = gmath::normalize({0, -1.0f, 1});
 
     auto t0 = std::chrono::high_resolution_clock::now();
@@ -54,10 +54,10 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
                 worldVerts[j] = vert;
                 
                 // world -> view
-                vert -= cam.position;
-                vert = gmath::rotateY(vert, -cam.rotation.y);
-                vert = gmath::rotateX(vert, -cam.rotation.x);
-                vert = gmath::rotateZ(vert, -cam.rotation.z);
+                vert -= m_cam.position;
+                vert = gmath::rotateY(vert, -m_cam.rotation.y);
+                vert = gmath::rotateX(vert, -m_cam.rotation.x);
+                vert = gmath::rotateZ(vert, -m_cam.rotation.z);
                 
                 viewVerts[j] = vert;
             }
@@ -110,7 +110,6 @@ void Renderer::render(const Camera& cam, View<Transform, Model, Material>& view)
                     .normalB = clippedNormals[j],
                     .normalC = clippedNormals[j+1],
                     .color = material.color,
-                    .camPos = cam.position,
                     .lightDir = lightDir
                 };
                 drawTriangle(v2f);
@@ -267,7 +266,7 @@ void Renderer::drawTriangle(const V2F& v2f) {
                 m_zBuffer[idx] = z;
 
                 Vec3 fragPos = v2f.worldA * w0 + v2f.worldB * w1 + v2f.worldC * w2;
-                Vec3 camDir = gmath::normalize(v2f.camPos - fragPos);
+                Vec3 camDir = gmath::normalize(m_cam.position - fragPos);
 
                 Vec3 normal = gmath::normalize(v2f.normalA * w0 + v2f.normalB * w1 + v2f.normalC * w2);
 

@@ -16,7 +16,6 @@
 #include "math3d.h"
 #include "ecs.h"
 #include "model.h"
-#include "camera.h"
 #include "renderer.h"
 #include "gameObject.h"
 #include "scene.h"
@@ -30,6 +29,7 @@
 #include "schemaRegistry.h"
 #include "parser.h"
 #include "physicSystem.h"
+#include "characterMovementSystem.h"
 #include "logger.h"
 
 #ifdef _WIN32
@@ -252,15 +252,15 @@ Entity loadSceneFile(const std::string& filename) {
     }
     return registry.getEntitiyCount();
 }
-
+/*
 void updateCamera(Camera& cam) {
 #ifdef _WIN32
-    if (GetAsyncKeyState(VK_UP) & 0x8000) {
-        cam.rotation.x -= 0.05f;
-    }
-    if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
-        cam.rotation.x += 0.05f;
-    }
+    // if (GetAsyncKeyState(VK_UP) & 0x8000) {
+    //     cam.rotation.x -= 0.05f;
+    // }
+    // if (GetAsyncKeyState(VK_DOWN) & 0x8000) {
+    //     cam.rotation.x += 0.05f;
+    // }
     if (GetAsyncKeyState(VK_LEFT) & 0x8000) {
         cam.rotation.y -= 0.05f;
     }
@@ -280,12 +280,12 @@ void updateCamera(Camera& cam) {
     if (GetAsyncKeyState('D') & 0x8000) {
         cam.position += gmath::normalize(cam.right()) * 0.1f;
     }
-    if (GetAsyncKeyState('E') & 0x8000) {
-        cam.position.y += 0.01f;
-    }
-    if (GetAsyncKeyState('Q') & 0x8000) {
-        cam.position.y -= 0.01f;
-    }
+    // if (GetAsyncKeyState('E') & 0x8000) {
+    //     cam.position.y += 0.01f;
+    // }
+    // if (GetAsyncKeyState('Q') & 0x8000) {
+    //     cam.position.y -= 0.01f;
+    // }
 #else
     pollInput();
     if (key_up) cam.rotation.x -= 0.05f;
@@ -301,6 +301,7 @@ void updateCamera(Camera& cam) {
     if (key_q) cam.position.y -= 0.01f;
 #endif
 }
+*/
 
 void startSystems() {
     for (auto& system : systems) {
@@ -312,6 +313,13 @@ void updateSystems(float deltaTime) {
     for (auto& system : systems) {
         system->doUpdate(registry, deltaTime);
     }
+}
+
+Entity addCamera() {
+    Entity camEntity = registry.create();
+    registry.get<Camera>().addComponent(camEntity, Camera{5.0f, 0.1f});
+    registry.get<Transform>().addComponent(camEntity, Transform({0, 0.9f, -1.0f}));
+    return camEntity;
 }
 
 int main() {
@@ -343,9 +351,9 @@ int main() {
     float angle = 0.0f;
     float time = 0.0f;
 
-    Camera cam({0, 0, -1.0f});
+    Entity cam = addCamera();
 
-    Renderer renderer(WIDTH, HEIGHT, fov);
+    Renderer renderer(WIDTH, HEIGHT, fov, registry.get<Transform>().get(cam));
 
     // registry.get<SinComponent>().addComponent(1, SinComponent());
     auto test = registry.view<Transform, Model, Material>();
@@ -361,6 +369,7 @@ int main() {
     BindSystem<SinAnimSystem>();
     BindSystem<RotateAnimSystem>();
     BindSystem<PhysicsSystem>();
+    BindSystem<CharacterMovementSystem>();
     // BindSystem<SpinSystem>();
     startSystems();
 
@@ -369,10 +378,10 @@ int main() {
 
     while (true) {
         renderer.clearBuffer();
-        updateCamera(cam);
+        // updateCamera(cam);
         auto t0 = std::chrono::high_resolution_clock::now();
         updateSystems(0.016f);
-        renderer.render(cam, test);
+        renderer.render(test);
         // std::cout << "hi" << time << std::endl;
         // SinAnimSystem(registry.getComponentArray<SinComponent>(), registry.getComponentArray<Transform>(), time);
 

@@ -80,6 +80,9 @@ struct Transform {
     Transform(Vec3 pos) : position(pos), rotation({0, 0, 0}), scale({1, 1, 1}) {}
     Transform(Vec3 pos, Vec3 rot) : position(pos), rotation(rot), scale({1, 1, 1}) {}
     Transform(Vec3 pos, Vec3 rot, Vec3 scale) : position(pos), rotation(rot), scale(scale) {}
+
+    Vec3 forward() const;
+    Vec3 right() const;
 };
 
 

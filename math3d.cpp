@@ -28,6 +28,25 @@ std::istream& operator>>(std::istream& is, Vec3& v) {
     return is;
 }
 
+Vec3 Transform::forward() const {
+    // Compute forward vector based on rotation
+    float cosPitch = std::cos(rotation.x);
+    float sinPitch = std::sin(rotation.x);
+    float cosYaw = std::cos(rotation.y);
+    float sinYaw = std::sin(rotation.y);
+
+    return {
+        cosPitch * sinYaw,
+        -sinPitch,
+        cosPitch * cosYaw
+    };
+}
+
+Vec3 Transform::right() const {
+    Vec3 fwd = forward();
+    return {fwd.z, 0, -fwd.x}; // Simple right vector based on forward
+}
+
 namespace gmath {
     Vec3 cross(Vec3 a, Vec3 b) {
         return {
