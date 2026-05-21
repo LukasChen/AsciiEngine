@@ -132,7 +132,7 @@ void BindSystem() {
     systems.push_back(std::make_unique<T>(registry));
 }
 
-const int WIDTH = 80;
+const int WIDTH = 90;
 const int HEIGHT = 40;
 const float fov = 60.0f;
 
@@ -322,6 +322,32 @@ Entity addCamera() {
     return camEntity;
 }
 
+void generateSphere(Vec3 pos, float t) {
+    Entity sphere = registry.create();
+    registry.get<Transform>().addComponent(sphere, Transform(pos, Vec3{0, 0, 0}, Vec3{0.1f, 0.1f, 0.1f}));
+    registry.get<Model>().addComponent(sphere, Primitive::createSphere(4));
+    registry.get<Material>().addComponent(sphere, Material(Color{1, 0, 0}));
+    registry.get<SinComponent>().addComponent(sphere, SinComponent{10.0f, 0.5f, t});
+}
+
+void generateSphereWave(int items) {
+    float spacing = 0.3f;
+    float width = items * spacing;
+    float half = width * 0.5f;
+    for(int i = 0; i < items; i++) {
+        for (int j = 0; j < items; j++) {
+            float t = static_cast<float>(i + j) / (items * 2);
+            t = t * M_PI;
+            Vec3 pos = { 
+                (static_cast<float>(i) * spacing) - half,
+                0,
+                (static_cast<float>(j) * spacing) - half 
+            };
+            generateSphere(pos, t);
+        }
+    }
+}
+
 int main() {
 #ifdef _WIN32
     setupWindowCursor();
@@ -333,7 +359,7 @@ int main() {
     std::cout << "\033[H\033[2J";
 
     registerComponentType<SinComponent>("SinAnim");
-    registerComponentType<RotateComponent>("Rotate");
+    // Entity count = loadSceneFile("scene.txt");
     registerComponentType<Collider>("Collider");
     registerComponentType<Rigidbody>("Rigidbody");
 
@@ -364,6 +390,8 @@ int main() {
     registry.get<Material>().addComponent(planeEntity, Material{{0.8f, 0.8f, 0.8f}});
     registry.get<Collider>().addComponent(planeEntity, Collider{{10.0f, 0.01f, 10.0f}});
     registry.get<Rigidbody>().addComponent(planeEntity, Rigidbody{.isStatic = true});
+
+    generateSphereWave(10);
 
 
     BindSystem<SinAnimSystem>();

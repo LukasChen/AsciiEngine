@@ -5,6 +5,7 @@
 struct SinComponent {
     float speed;
     float amplitude;
+    float offset;
     float startY;
     float time;
 };
