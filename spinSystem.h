@@ -5,7 +5,9 @@
 
 class SpinSystem : public System<Transform> {
 protected:
-    void update(View<Transform>& view, float deltaTime) override {
+    using System::System;
+
+    void update(View<Transform>& view, Registry&, float deltaTime) override {
         float speed = 3.0f;
         for (auto [transform] : view) {
             transform.rotation.y += deltaTime * speed; // Rotate around Y-axis

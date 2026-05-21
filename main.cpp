@@ -129,7 +129,7 @@ std::vector<std::unique_ptr<BaseSystem>> systems;
 
 template<typename T>
 void BindSystem() {
-    systems.push_back(std::make_unique<T>());
+    systems.push_back(std::make_unique<T>(registry));
 }
 
 const int WIDTH = 80;
@@ -317,7 +317,7 @@ void updateSystems(float deltaTime) {
 
 Entity addCamera() {
     Entity camEntity = registry.create();
-    registry.get<Camera>().addComponent(camEntity, Camera{5.0f, 0.1f});
+    registry.get<Camera>().addComponent(camEntity, Camera{5.0f, 3.0f});
     registry.get<Transform>().addComponent(camEntity, Transform({0, 0.9f, -1.0f}));
     return camEntity;
 }
@@ -353,7 +353,7 @@ int main() {
 
     Entity cam = addCamera();
 
-    Renderer renderer(WIDTH, HEIGHT, fov, registry.get<Transform>().get(cam));
+    Renderer renderer(WIDTH, HEIGHT, fov, cam);
 
     // registry.get<SinComponent>().addComponent(1, SinComponent());
     auto test = registry.view<Transform, Model, Material>();
@@ -381,7 +381,7 @@ int main() {
         // updateCamera(cam);
         auto t0 = std::chrono::high_resolution_clock::now();
         updateSystems(0.016f);
-        renderer.render(test);
+        renderer.render(test, registry);
         // std::cout << "hi" << time << std::endl;
         // SinAnimSystem(registry.getComponentArray<SinComponent>(), registry.getComponentArray<Transform>(), time);
 

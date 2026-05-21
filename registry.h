@@ -10,6 +10,12 @@ public:
         return m_nextEntity++;
     }
 
+    void flushDeferredAdds() {
+        for (auto& [_, componentArray] : componentArrays) {
+            componentArray->flushPending();
+        }
+    }
+
     Entity getEntitiyCount() const {
         return m_nextEntity;
     }

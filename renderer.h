@@ -15,10 +15,10 @@
 
 class Renderer {
 public:
-    Renderer(int width, int height, float fov, Transform& camTrans);
+    Renderer(int width, int height, float fov, Entity cam);
     ~Renderer();
 
-    void render(View<Transform, Model, Material>& view);
+    void render(View<Transform, Model, Material>& view, Registry& registry);
     void clearBuffer();
     std::vector<std::string> renderLog;
 private:
@@ -50,7 +50,7 @@ private:
 
     float m_fovRad;
     float m_projectionScale;
-    Transform& m_cam;
+    Entity m_cam;
 
     struct ClippedVertex {
         Vec3 viewPos;
@@ -69,6 +69,7 @@ private:
         Vec3 normalB;
         Vec3 normalC;
         Color color;
+        Transform& cam;
         Vec3 lightDir;
     };
 

@@ -24,6 +24,9 @@ static AutoRegisterSchema<RotateComponent> regRotate({
 
 struct Material {
     Color color;
+
+    Material() {}
+    Material(Color c) : color(c) {}
 };
 
 static AutoRegisterSchema<Material> regMaterial({
@@ -50,5 +53,5 @@ static AutoRegisterSchema<Rigidbody> regRigidbody({
 
 struct Camera {
     float moveSpeed = 5.0f;
-    float lookSpeed = 5.0f;
+    float lookSpeed = 30.0f;
 };

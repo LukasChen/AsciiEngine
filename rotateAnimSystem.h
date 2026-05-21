@@ -5,7 +5,9 @@
 
 class RotateAnimSystem : public System<RotateComponent, Transform> {
 protected:
-    void update(View<RotateComponent, Transform>& view, float deltaTime) override {
+    using System::System;
+
+    void update(View<RotateComponent, Transform>& view, Registry&, float deltaTime) override {
         for (auto [rotateComp, transform] : view) {
             transform.rotation.x += rotateComp.speed * deltaTime;
         }

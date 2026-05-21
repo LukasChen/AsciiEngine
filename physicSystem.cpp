@@ -5,7 +5,7 @@ namespace {
     constexpr float SPIN_DAMPING = 0.995f;
 }
 
-void PhysicsSystem::update(View<Rigidbody, Collider, Transform>& view, float deltaTime) {
+void PhysicsSystem::update(View<Rigidbody, Collider, Transform>& view, Registry&, float deltaTime) {
     for (auto [rb, col, tr] : view) {
 
         rb.velocity.y -= GRAVITY * deltaTime;

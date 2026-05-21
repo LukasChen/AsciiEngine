@@ -15,6 +15,8 @@ struct AABB {
 
 class PhysicsSystem: public System<Rigidbody, Collider, Transform> {
 public:
+    using System::System;
+
     void start(View<Rigidbody, Collider, Transform>& view) override {
         // Initialize rigidbodies with some velocity
         for (auto [rb, col, tr] : view) {
@@ -22,7 +24,7 @@ public:
             rb.angularVelocity = Vec3{0, 0, 0};
         }
     }
-    void update(View<Rigidbody, Collider, Transform>& view, float deltaTime);
+    void update(View<Rigidbody, Collider, Transform>& view, Registry&, float deltaTime);
 
 private:
     bool checkCollision(const Transform& t1, const Collider& col1, const Transform& t2, const Collider& col2);

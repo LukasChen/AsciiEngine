@@ -8,6 +8,7 @@ using Entity = uint32_t; // Simple alias for entity IDs
 class IComponentArray {
 public:
     virtual ~IComponentArray() = default;
+    virtual void flushPending() = 0;
 };
 
 template<typename T>
@@ -17,17 +18,28 @@ public:
 
     // Pass-by-value and move idiom
     void addComponent(Entity entity, T component) {
-        m_entityToIndex[entity] = data.size();
-        m_indexToEntity.push_back(entity);
-        data.push_back(std::move(component));
+        addComponentImmediate(entity, std::move(component));
+    }
+
+    void deferAddComponent(Entity entity, T component) {
+        m_pendingAdds.push_back(PendingAdd{entity, std::move(component)});
+    }
+
+    void flushPending() override {
+        if (m_pendingAdds.empty()) {
+            return;
+        }
+
+        for (auto& pendingAdd : m_pendingAdds) {
+            addComponentImmediate(pendingAdd.entity, std::move(pendingAdd.component));
+        }
+        m_pendingAdds.clear();
     }
 
     // perfect forward
     template<typename... Args>
     void emplaceComponent(Entity entity, Args&&... args) {
-        m_entityToIndex[entity] = data.size();
-        m_indexToEntity.push_back(entity);
-        data.emplace_back(std::forward<Args>(args)...);
+        addComponent(entity, T(std::forward<Args>(args)...));
     }
 
     bool has(Entity entity) const {
@@ -41,7 +53,7 @@ public:
     T* tryGet(Entity entity) {
         auto it = m_entityToIndex.find(entity);
         if (it != m_entityToIndex.end()) {
-            return &data[it->second];
+            return &data.at(it->second);
         }
         return nullptr;
     }
@@ -51,6 +63,18 @@ public:
     }
 
 private:
+    struct PendingAdd {
+        Entity entity;
+        T component;
+    };
+
+    void addComponentImmediate(Entity entity, T component) {
+        m_entityToIndex[entity] = data.size();
+        m_indexToEntity.push_back(entity);
+        data.push_back(std::move(component));
+    }
+
+    std::vector<PendingAdd> m_pendingAdds;
     std::unordered_map<Entity, size_t> m_entityToIndex;
     std::vector<Entity> m_indexToEntity;
 };
