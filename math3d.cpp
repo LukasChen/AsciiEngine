@@ -100,4 +100,40 @@ namespace gmath {
         float d = dot(I, normal);
         return I - normal * d * 2.0f;
     }
+
+    Color hsvToRgb(float h, float s, float v) {
+        auto clamp01 = [](float value) {
+            return value < 0.0f ? 0.0f : (value > 1.0f ? 1.0f : value);
+        };
+
+        h = std::fmod(h, 360.0f);
+        if (h < 0.0f) h += 360.0f;
+        s = clamp01(s);
+        v = clamp01(v);
+
+        float c = v * s;
+        float x = c * (1.0f - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
+        float m = v - c;
+
+        Color rgb{0.0f, 0.0f, 0.0f};
+        if (h < 60.0f) {
+            rgb = {c, x, 0.0f};
+        } else if (h < 120.0f) {
+            rgb = {x, c, 0.0f};
+        } else if (h < 180.0f) {
+            rgb = {0.0f, c, x};
+        } else if (h < 240.0f) {
+            rgb = {0.0f, x, c};
+        } else if (h < 300.0f) {
+            rgb = {x, 0.0f, c};
+        } else {
+            rgb = {c, 0.0f, x};
+        }
+
+        return rgb + m;
+    }
+
+    Color hsvToRgb(Vec3 hsv) {
+        return hsvToRgb(hsv.x, hsv.y, hsv.z);
+    }
 }

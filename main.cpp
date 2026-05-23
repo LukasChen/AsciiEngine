@@ -322,12 +322,16 @@ Entity addCamera() {
     return camEntity;
 }
 
-void generateSphere(Vec3 pos, float t) {
+void generateSphere(Vec3 pos, float t, float hue) {
     Entity sphere = registry.create();
     registry.get<Transform>().addComponent(sphere, Transform(pos, Vec3{0, 0, 0}, Vec3{0.1f, 0.1f, 0.1f}));
     registry.get<Model>().addComponent(sphere, Primitive::createSphere(4));
-    registry.get<Material>().addComponent(sphere, Material(Color{1, 0, 0}));
-    registry.get<SinComponent>().addComponent(sphere, SinComponent{10.0f, 0.5f, t});
+
+    Color hsv = {hue, 1.0f, 1.0f};
+    Color rgb = gmath::hsvToRgb(hsv);
+
+    registry.get<Material>().addComponent(sphere, Material(rgb));
+    registry.get<SinComponent>().addComponent(sphere, SinComponent{10.0f, 1.0f, t});
 }
 
 void generateSphereWave(int items) {
@@ -337,13 +341,14 @@ void generateSphereWave(int items) {
     for(int i = 0; i < items; i++) {
         for (int j = 0; j < items; j++) {
             float t = static_cast<float>(i + j) / (items * 2);
-            t = t * M_PI;
+            float phi = t * M_PI;
+            float hue = t * 360.0f;
             Vec3 pos = { 
                 (static_cast<float>(i) * spacing) - half,
                 0,
                 (static_cast<float>(j) * spacing) - half 
             };
-            generateSphere(pos, t);
+            generateSphere(pos, phi, hue);
         }
     }
 }

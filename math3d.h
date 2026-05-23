@@ -103,4 +103,7 @@ namespace gmath {
     Vec3 rotateY(Vec3 v, float angle);
     Vec3 rotateZ(Vec3 v, float angle);
     Vec3 reflect(Vec3 I, Vec3 normal);
+    Color hsvToRgb(float h, float s, float v);
+    Color hsvToRgb(Vec3 hsv);
 }
+
