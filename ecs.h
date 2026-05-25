@@ -1,14 +1,19 @@
 #pragma once
+#include <algorithm>
 #include <cstdint>
-#include <vector>
+#include <limits>
 #include <unordered_map>
+#include <vector>
 #include <typeindex>
+
 using Entity = uint32_t; // Simple alias for entity IDs
+constexpr Entity INVALID_ENTITY = std::numeric_limits<Entity>::max();
 
 class IComponentArray {
 public:
     virtual ~IComponentArray() = default;
     virtual void flushPending() = 0;
+    virtual void removeEntity(Entity entity) = 0;
 };
 
 template<typename T>
@@ -34,6 +39,30 @@ public:
             addComponentImmediate(pendingAdd.entity, std::move(pendingAdd.component));
         }
         m_pendingAdds.clear();
+    }
+
+    void removeEntity(Entity entity) override {
+        removePending(entity);
+
+        auto it = m_entityToIndex.find(entity);
+        if (it == m_entityToIndex.end()) {
+            return;
+        }
+
+        const size_t removedIndex = it->second;
+        const size_t lastIndex = data.size() - 1;
+
+        if (removedIndex != lastIndex) {
+            data[removedIndex] = std::move(data[lastIndex]);
+
+            const Entity movedEntity = m_indexToEntity[lastIndex];
+            m_indexToEntity[removedIndex] = movedEntity;
+            m_entityToIndex[movedEntity] = removedIndex;
+        }
+
+        data.pop_back();
+        m_indexToEntity.pop_back();
+        m_entityToIndex.erase(it);
     }
 
     // perfect forward
@@ -67,6 +96,19 @@ private:
         Entity entity;
         T component;
     };
+
+    void removePending(Entity entity) {
+        m_pendingAdds.erase(
+            std::remove_if(
+                m_pendingAdds.begin(),
+                m_pendingAdds.end(),
+                [entity](const PendingAdd& pendingAdd) {
+                    return pendingAdd.entity == entity;
+                }
+            ),
+            m_pendingAdds.end()
+        );
+    }
 
     void addComponentImmediate(Entity entity, T component) {
         m_entityToIndex[entity] = data.size();

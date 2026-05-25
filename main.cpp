@@ -30,6 +30,7 @@
 #include "parser.h"
 #include "physicSystem.h"
 #include "characterMovementSystem.h"
+#include "enemySystem.h"
 #include "logger.h"
 
 #ifdef _WIN32
@@ -119,7 +120,7 @@ void registerComponentType(const std::string& name) {
         }
         registry.get<T>().addComponent(entity, std::move(component));
     };
-    sceneLog.push_back("Registered component type: " + name);
+    Logger::log("Registered component type: " + name);
 }
 
 
@@ -132,7 +133,7 @@ void BindSystem() {
     systems.push_back(std::make_unique<T>(registry));
 }
 
-const int WIDTH = 90;
+const int WIDTH = 80;
 const int HEIGHT = 40;
 const float fov = 60.0f;
 
@@ -197,6 +198,11 @@ Entity loadSceneFile(const std::string& filename) {
 
         if (!parseVec3(sv, transform.rotation)) {
             sceneLog.push_back("Invalid rotation format in line: " + line);
+            continue;
+        }
+
+        if (!parseVec3(sv, transform.scale)) {
+            sceneLog.push_back("Invalid scale format in line: " + line);
             continue;
         }
 
@@ -319,6 +325,7 @@ Entity addCamera() {
     Entity camEntity = registry.create();
     registry.get<Camera>().addComponent(camEntity, Camera{5.0f, 3.0f});
     registry.get<Transform>().addComponent(camEntity, Transform({0, 0.9f, -1.0f}));
+    registry.SetPlayerEntity(camEntity);
     return camEntity;
 }
 
@@ -363,17 +370,19 @@ int main() {
     std::cout << "\033[?25l" << std::flush;
     std::cout << "\033[H\033[2J";
 
+    Logger::init("scene_log.txt");
+
     registerComponentType<SinComponent>("SinAnim");
     // Entity count = loadSceneFile("scene.txt");
     registerComponentType<Collider>("Collider");
     registerComponentType<Rigidbody>("Rigidbody");
+    registerComponentType<Enemy>("Enemy");
 
     Entity count = loadSceneFile("scene.txt");
     // float startY = scene.transforms.getComponent(1)->position.y;
     // SinComponent sinComp{startY};
     // scene.sinComponents.addComponent(1, sinComp);
 
-    Logger::init("scene_log.txt");
 
     // std::cout << "Loaded " << count << " objects into the scene.\n";
 
@@ -396,15 +405,16 @@ int main() {
     registry.get<Collider>().addComponent(planeEntity, Collider{{10.0f, 0.01f, 10.0f}});
     registry.get<Rigidbody>().addComponent(planeEntity, Rigidbody{.isStatic = true});
 
-    generateSphereWave(10);
-
 
     BindSystem<SinAnimSystem>();
     BindSystem<RotateAnimSystem>();
     BindSystem<PhysicsSystem>();
     BindSystem<CharacterMovementSystem>();
+    BindSystem<EnemySystem>();
     // BindSystem<SpinSystem>();
     startSystems();
+
+    Logger::log("Starting game loop");
 
     std::cout << "\033[H\033[2J";
 

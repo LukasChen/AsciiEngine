@@ -18,6 +18,7 @@ add_executable(renderer
     renderer.cpp
     primitive.cpp
     physicSystem.cpp
+    enemySystem.cpp
 )
 
 # geometry.h and model.h are header-only, so just make sure their directory is included

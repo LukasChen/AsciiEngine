@@ -27,6 +27,10 @@ public:
             );
         }
 
+        Entity entity() const {
+            return currentEntity();
+        }
+
         Iterator& operator++() {
             ++m_index;
             skipInvalid();

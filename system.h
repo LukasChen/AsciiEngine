@@ -37,4 +37,8 @@ protected:
     void AddComponent(Entity entity, T&& component) {
         m_registry.get<T>().deferAddComponent(entity, std::forward<T>(component));
     }
+
+    void DestroyEntity(Entity entity) {
+        m_registry.deferDestroy(entity);
+    }
 };

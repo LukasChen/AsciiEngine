@@ -6,9 +6,13 @@ namespace {
 }
 
 void PhysicsSystem::update(View<Rigidbody, Collider, Transform>& view, Registry&, float deltaTime) {
+    m_registry.collisionEvents.clear();
+
     for (auto [rb, col, tr] : view) {
 
-        rb.velocity.y -= GRAVITY * deltaTime;
+        if (rb.useGravity) {
+            rb.velocity.y -= GRAVITY * deltaTime;
+        }
         tr.position += rb.velocity * deltaTime;
         tr.rotation += rb.angularVelocity * deltaTime;
         rb.angularVelocity = rb.angularVelocity * SPIN_DAMPING;
@@ -31,6 +35,8 @@ void PhysicsSystem::update(View<Rigidbody, Collider, Transform>& view, Registry&
             auto [rb2, col2, tr2] = *second;
 
             if (checkCollision(tr1, col1, tr2, col2)) {
+
+                m_registry.collisionEvents.push_back({first.entity(), second.entity()})
                 resolveCollision(rb1, tr1, col1, rb2, tr2, col2);
             }
         }

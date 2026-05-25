@@ -1,6 +1,7 @@
 #pragma once
 #include "math3d.h"
 #include "schemaRegistry.h"
+#include "ecs.h"
 
 struct SinComponent {
     float speed;
@@ -46,13 +47,25 @@ struct Rigidbody {
     Vec3 velocity{0.0f, 0.0f, 0.0f};
     Vec3 angularVelocity{0.0f, 0.0f, 0.0f};
     bool isStatic = false;
+    bool useGravity = false;
 };
 
 static AutoRegisterSchema<Rigidbody> regRigidbody({
-    makeField(&Rigidbody::isStatic)
+    makeField(&Rigidbody::isStatic),
+    makeField(&Rigidbody::useGravity)
 });
 
 struct Camera {
     float moveSpeed = 5.0f;
     float lookSpeed = 30.0f;
 };
+
+struct Enemy {
+    float speed;
+};
+
+static AutoRegisterSchema<Enemy> regEnemy({
+    makeField(&Enemy::speed)
+});
+
+struct Bullet {};
